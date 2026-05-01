@@ -1,0 +1,19 @@
+{
+    "sqltools.connections": [
+        {
+            "connectionTimeout": 15,
+            "mssqlOptions": {
+                "appName": "SQLTools",
+                "useUTC": true,
+                "encrypt": true,
+                "trustServerCertificate": false
+            },
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "localhost",
+            "driver": "MSSQL",
+            "name": "DEV",
+            "connectString": "Driver={SQL Server};Server=182.168.0.116;Database=INBOX;Uid=sa;Pwd=w@tch9u@rd;"
+        }
+    ]
+}

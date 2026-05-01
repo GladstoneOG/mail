@@ -1,0 +1,301 @@
+<?php
+/**
+ * Compose Message - with Address Book Modal + Rich Text Editor
+ */
+$userId = auth_user_id();
+$replyId = isset($_GET['reply']) ? intval($_GET['reply']) : 0;
+$replyAllId = isset($_GET['replyall']) ? intval($_GET['replyall']) : 0;
+$forwardId = isset($_GET['forward']) ? intval($_GET['forward']) : 0;
+$draftId = isset($_GET['draft']) ? intval($_GET['draft']) : 0;
+
+$prefillTo = ''; $prefillCc = ''; $prefillSubject = ''; $prefillBody = '';
+$forwardAttIds = array();
+
+if ($replyId || $replyAllId) {
+    $origId = $replyId ? $replyId : $replyAllId;
+    $orig = db_fetch_one($conn, "SELECT m.*, u.display_name AS sender_name, u.username AS sender_username
+                                  FROM mail_messages m JOIN mail_users u ON m.sender_id = u.id WHERE m.id = ?", array($origId));
+    if ($orig) {
+        $prefillTo = $orig['sender_username'];
+        $prefillSubject = 'Re: ' . preg_replace('/^Re:\s*/i', '', $orig['subject']);
+        $prefillBody = '<br><br><div style="border-left:3px solid #555;padding-left:12px;color:#888;">--- Original Message from ' . e($orig['sender_name']) . ' ---<br>' . $orig['body'] . '</div>';
+        if ($replyAllId) {
+            $others = db_fetch_all($conn, "SELECT u.username FROM mail_recipients mr JOIN mail_users u ON mr.recipient_id = u.id
+                                            WHERE mr.message_id = ? AND mr.recipient_id != ? AND mr.recipient_type = 'to'", array($origId, $userId));
+            foreach ($others as $o) $prefillTo .= ', ' . $o['username'];
+            $ccU = db_fetch_all($conn, "SELECT u.username FROM mail_recipients mr JOIN mail_users u ON mr.recipient_id = u.id
+                                        WHERE mr.message_id = ? AND mr.recipient_type = 'cc'", array($origId));
+            $ccNames = array();
+            foreach ($ccU as $c) $ccNames[] = $c['username'];
+            $prefillCc = implode(', ', $ccNames);
+        }
+    }
+}
+
+if ($forwardId) {
+    $orig = db_fetch_one($conn, "SELECT m.*, u.display_name AS sender_name FROM mail_messages m
+                                  JOIN mail_users u ON m.sender_id = u.id WHERE m.id = ?", array($forwardId));
+    if ($orig) {
+        $prefillSubject = 'Fwd: ' . preg_replace('/^Fwd:\s*/i', '', $orig['subject']);
+        $prefillBody = '<br><br><div style="border-left:3px solid #555;padding-left:12px;color:#888;">--- Forwarded from ' . e($orig['sender_name']) . ' ---<br>' . $orig['body'] . '</div>';
+        $fwdAtts = db_fetch_all($conn, "SELECT id, original_name, file_size FROM mail_attachments WHERE message_id = ?", array($forwardId));
+        foreach ($fwdAtts as $fa) $forwardAttIds[] = $fa;
+    }
+}
+
+if ($draftId) {
+    $draft = db_fetch_one($conn, "SELECT * FROM mail_messages WHERE id = ? AND sender_id = ? AND is_draft = 1", array($draftId, $userId));
+    if ($draft) {
+        $prefillSubject = $draft['subject'];
+        $prefillBody = $draft['body'];
+        $recipients = db_fetch_all($conn, "SELECT u.username, mr.recipient_type FROM mail_recipients mr
+                                            JOIN mail_users u ON mr.recipient_id = u.id WHERE mr.message_id = ?", array($draftId));
+        $toL = array(); $ccL = array();
+        foreach ($recipients as $r) {
+            if ($r['recipient_type'] === 'cc') $ccL[] = $r['username'];
+            else $toL[] = $r['username'];
+        }
+        $prefillTo = implode(', ', $toL);
+        $prefillCc = implode(', ', $ccL);
+    }
+}
+
+if (isset($_GET['to'])) $prefillTo = $_GET['to'];
+
+// Get all users for address book
+$allUsers = db_fetch_all($conn, "SELECT id, username, display_name FROM mail_users WHERE id != ? AND is_active = 1 ORDER BY display_name", array($userId));
+?>
+
+<div class="page-header"><h2>Compose Message</h2></div>
+
+<!-- Address Book Modal (#1) -->
+<div class="modal-overlay" id="ab-modal" style="display:none" onclick="if(event.target===this)closeAddressBook()">
+    <div class="modal" style="max-width:560px">
+        <div class="modal-header">
+            <h3>&#x1F4D6; Address Book</h3>
+            <button class="modal-close" onclick="closeAddressBook()">&times;</button>
+        </div>
+        <div style="padding:12px 20px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <input type="text" id="ab-filter" placeholder="Search users..." oninput="filterAddressBook(this.value)" style="flex:1;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px">
+        </div>
+        <div class="modal-body" style="padding:12px 20px">
+            <table class="data-table ab-table" id="ab-list">
+                <thead>
+                    <tr>
+                        <th style="width:36px"><input type="checkbox" id="ab-select-all" onchange="abToggleAll(this.checked)"></th>
+                        <th>User</th>
+                        <th>Username</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($allUsers as $u): ?>
+                        <tr class="ab-row" data-search="<?php echo e(strtolower($u['display_name'] . ' ' . $u['username'])); ?>">
+                            <td><input type="checkbox" class="ab-check" value="<?php echo e($u['username']); ?>"></td>
+                            <td>
+                                <div class="user-cell">
+                                    <div class="avatar-xs" style="background:<?php echo get_avatar_color($u['display_name']); ?>"><?php echo e(get_initials($u['display_name'])); ?></div>
+                                    <?php echo e($u['display_name']); ?>
+                                </div>
+                            </td>
+                            <td>@<?php echo e($u['username']); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <div style="padding:12px 20px 16px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap">
+            <button type="button" class="btn btn-sm btn-primary" onclick="addCheckedAs('to')">Add as To</button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="addCheckedAs('cc')">Add as CC</button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="addCheckedAs('bcc')">Add as BCC</button>
+            <!-- <button type="button" class="btn btn-sm btn-ghost" onclick="closeAddressBook()" style="margin-left:auto">Done</button> -->
+        </div>
+    </div>
+</div>
+
+<form id="compose-form" class="compose-form" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="<?php echo e($csrfToken); ?>">
+    <input type="hidden" name="draft_id" value="<?php echo $draftId; ?>">
+    <input type="hidden" name="forward_attachments" id="forward_attachments" value="<?php echo implode(',', array_map(function($a){ return $a['id']; }, $forwardAttIds)); ?>">
+
+    <div class="form-group">
+        <label for="to">To</label>
+        <div class="to-input-row">
+            <button type="button" class="ab-open-btn" onclick="openAddressBook()" title="Open Address Book">&#x1F4D6;</button>
+            <input type="text" id="to" name="to" placeholder="Type usernames separated by commas..." value="<?php echo e($prefillTo); ?>" class="recipient-input" autocomplete="off">
+        </div>
+        <div class="autocomplete-dropdown" id="to-dropdown"></div>
+    </div>
+    <div class="form-row-toggle">
+        <a href="#" onclick="toggleCcBcc();return false;" class="toggle-link" id="cc-bcc-toggle">Show CC / BCC</a>
+    </div>
+    <div id="cc-bcc-fields" style="display:<?php echo $prefillCc ? 'block' : 'none'; ?>">
+        <div class="form-group">
+            <label for="cc">CC</label>
+            <input type="text" id="cc" name="cc" placeholder="CC recipients..." value="<?php echo e($prefillCc); ?>" class="recipient-input" autocomplete="off">
+            <div class="autocomplete-dropdown" id="cc-dropdown"></div>
+        </div>
+        <div class="form-group">
+            <label for="bcc">BCC</label>
+            <input type="text" id="bcc" name="bcc" placeholder="BCC recipients..." class="recipient-input" autocomplete="off">
+            <div class="autocomplete-dropdown" id="bcc-dropdown"></div>
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="subject">Subject</label>
+        <input type="text" id="subject" name="subject" placeholder="Message subject..." value="<?php echo e($prefillSubject); ?>">
+    </div>
+    <div class="form-group">
+        <label>Message</label>
+        <!-- Rich Text Editor Toolbar (#6 improved) -->
+        <div class="editor-toolbar" id="editor-toolbar">
+            <button type="button" id="tb-bold" onclick="execCmd('bold')" title="Bold (Ctrl+B)" class="tb-btn"><b>B</b></button>
+            <button type="button" id="tb-italic" onclick="execCmd('italic')" title="Italic (Ctrl+I)" class="tb-btn"><i>I</i></button>
+            <button type="button" id="tb-underline" onclick="execCmd('underline')" title="Underline (Ctrl+U)" class="tb-btn"><u>U</u></button>
+            <span class="toolbar-sep"></span>
+            <select onchange="execCmd('fontSize',this.value);this.selectedIndex=0" title="Font Size">
+                <option value="">Size</option>
+                <option value="1">Small</option>
+                <option value="3">Normal</option>
+                <option value="5">Large</option>
+                <option value="7">Huge</option>
+            </select>
+            <input type="color" value="#e2e8f0" onchange="execCmd('foreColor',this.value)" title="Text Color" class="color-pick">
+            <span class="toolbar-sep"></span>
+            <button type="button" id="tb-justifyLeft" onclick="execCmd('justifyLeft')" title="Align Left" class="tb-btn tb-active">&#x2190;</button>
+            <button type="button" id="tb-justifyCenter" onclick="execCmd('justifyCenter')" title="Center" class="tb-btn">&#x2194;</button>
+            <button type="button" id="tb-justifyRight" onclick="execCmd('justifyRight')" title="Align Right" class="tb-btn">&#x2192;</button>
+            <span class="toolbar-sep"></span>
+            <button type="button" id="tb-insertUnorderedList" onclick="execCmd('insertUnorderedList')" title="Bullet List" class="tb-btn">&#x2022;</button>
+            <button type="button" id="tb-insertOrderedList" onclick="execCmd('insertOrderedList')" title="Numbered List" class="tb-btn">1.</button>
+        </div>
+        <div id="editor" class="rich-editor" contenteditable="true"><?php echo $prefillBody; ?></div>
+        <input type="hidden" name="body" id="body-hidden">
+    </div>
+    <div class="form-group">
+        <label>Attachments</label>
+        <?php if (!empty($forwardAttIds)): ?>
+            <div class="fwd-att-list">
+                <strong>Forwarded attachments:</strong>
+                <?php foreach ($forwardAttIds as $fa): ?>
+                    <span class="fwd-att-item">&#x1F4CE; <?php echo e($fa['original_name']); ?> (<?php echo format_size($fa['file_size']); ?>)</span>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+        <div class="file-upload-area" id="file-upload-area">
+            <input type="file" id="attachments" name="attachments[]" multiple class="file-input">
+            <div class="file-upload-label">
+                <span class="upload-icon">&#x1F4CE;</span>
+                <span>Drop files here or <strong>click to browse</strong></span>
+            </div>
+        </div>
+        <div id="file-list" class="file-list"></div>
+    </div>
+    <div class="compose-actions">
+        <button type="submit" class="btn btn-primary" id="send-btn"><span>&#x1F4E8;</span> Send Message</button>
+        <button type="button" class="btn btn-secondary" id="draft-btn" onclick="saveDraft()"><span>&#x1F4DD;</span> Save Draft</button>
+        <button type="button" class="btn btn-ghost" onclick="if(confirm('Discard?'))window.location='index.php?page=inbox'">Discard</button>
+    </div>
+</form>
+
+<script>
+function toggleCcBcc() {
+    var el = document.getElementById('cc-bcc-fields');
+    var link = document.getElementById('cc-bcc-toggle');
+    if (el.style.display === 'none') { el.style.display = 'block'; link.textContent = 'Hide CC / BCC'; }
+    else { el.style.display = 'none'; link.textContent = 'Show CC / BCC'; }
+}
+
+// Address book modal
+function openAddressBook() { document.getElementById('ab-modal').style.display = 'flex'; }
+function closeAddressBook() { document.getElementById('ab-modal').style.display = 'none'; }
+
+function filterAddressBook(q) {
+    q = q.toLowerCase();
+    var rows = document.querySelectorAll('.ab-row');
+    for (var i = 0; i < rows.length; i++) {
+        rows[i].style.display = (!q || rows[i].getAttribute('data-search').indexOf(q) !== -1) ? '' : 'none';
+    }
+}
+function addCheckedAs(type) {
+    var checks = document.querySelectorAll('.ab-check:checked');
+    if (checks.length === 0) { alert('Select at least one user'); return; }
+    var field = document.getElementById(type === 'bcc' || type === 'cc' ? type : 'to');
+    if (type === 'cc' || type === 'bcc') {
+        document.getElementById('cc-bcc-fields').style.display = 'block';
+        document.getElementById('cc-bcc-toggle').textContent = 'Hide CC / BCC';
+    }
+    var current = field.value.trim();
+    var existing = current ? current.split(',').map(function(s){ return s.trim(); }) : [];
+    for (var i = 0; i < checks.length; i++) {
+        var uname = checks[i].value;
+        if (existing.indexOf(uname) === -1) existing.push(uname);
+        checks[i].checked = false;
+    }
+    field.value = existing.join(', ');
+    document.getElementById('ab-select-all').checked = false;
+    closeAddressBook();
+}
+function abToggleAll(checked) {
+    var rows = document.querySelectorAll('.ab-row');
+    for (var i = 0; i < rows.length; i++) {
+        if (rows[i].style.display !== 'none') {
+            rows[i].querySelector('.ab-check').checked = checked;
+        }
+    }
+}
+
+// Rich text editor with toggle state tracking (#6)
+function execCmd(cmd, val) {
+    var editor = document.getElementById('editor');
+    // Must focus editor BEFORE execCommand for first-click to work
+    editor.focus();
+    document.execCommand(cmd, false, val || null);
+    updateToolbarState();
+}
+
+function updateToolbarState() {
+    var toggleCmds = ['bold', 'italic', 'underline'];
+    for (var i = 0; i < toggleCmds.length; i++) {
+        var btn = document.getElementById('tb-' + toggleCmds[i]);
+        if (btn) {
+            if (document.queryCommandState(toggleCmds[i])) {
+                btn.classList.add('tb-active');
+            } else {
+                btn.classList.remove('tb-active');
+            }
+        }
+    }
+    // Alignment
+    var aligns = ['justifyLeft', 'justifyCenter', 'justifyRight'];
+    for (var j = 0; j < aligns.length; j++) {
+        var abtn = document.getElementById('tb-' + aligns[j]);
+        if (abtn) {
+            if (document.queryCommandState(aligns[j])) {
+                abtn.classList.add('tb-active');
+            } else {
+                abtn.classList.remove('tb-active');
+            }
+        }
+    }
+    // Lists
+    var lists = ['insertUnorderedList', 'insertOrderedList'];
+    for (var k = 0; k < lists.length; k++) {
+        var lbtn = document.getElementById('tb-' + lists[k]);
+        if (lbtn) {
+            if (document.queryCommandState(lists[k])) {
+                lbtn.classList.add('tb-active');
+            } else {
+                lbtn.classList.remove('tb-active');
+            }
+        }
+    }
+}
+
+// Track selection changes to update toolbar state
+var editor = document.getElementById('editor');
+if (editor) {
+    editor.addEventListener('keyup', updateToolbarState);
+    editor.addEventListener('mouseup', updateToolbarState);
+    editor.addEventListener('focus', updateToolbarState);
+}
+</script>
