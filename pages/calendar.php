@@ -3,6 +3,19 @@
  * Calendar Page - Monthly / Daily / Agenda views
  */
 $userId = auth_user_id();
+
+// Generate 24h time options (15-min increments)
+function cal_time_options($selected = '') {
+    $html = '';
+    for ($h = 0; $h < 24; $h++) {
+        for ($m = 0; $m < 60; $m += 15) {
+            $val = sprintf('%02d:%02d', $h, $m);
+            $sel = ($val === $selected) ? ' selected' : '';
+            $html .= '<option value="' . $val . '"' . $sel . '>' . $val . '</option>';
+        }
+    }
+    return $html;
+}
 $allUsers = db_fetch_all($conn, "SELECT id, username, display_name FROM mail_users WHERE id != ? AND is_active = 1 ORDER BY display_name", array($userId));
 
 // Count today's events for badge
@@ -84,7 +97,7 @@ $todayCount = intval(db_fetch_scalar($conn,
                 </div>
                 <div class="form-group" id="ev-start-time-group">
                     <label>Start Time</label>
-                    <input type="time" id="ev-start-time" value="08:00">
+                    <input type="text" id="ev-start-time" value="08:00" placeholder="HH:MM" maxlength="5" class="time-input-24h">
                 </div>
                 <div class="form-group">
                     <label>End Date</label>
@@ -92,7 +105,7 @@ $todayCount = intval(db_fetch_scalar($conn,
                 </div>
                 <div class="form-group" id="ev-end-time-group">
                     <label>End Time</label>
-                    <input type="time" id="ev-end-time" value="17:00">
+                    <input type="text" id="ev-end-time" value="09:00" placeholder="HH:MM" maxlength="5" class="time-input-24h">
                 </div>
             </div>
             <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
@@ -100,18 +113,18 @@ $todayCount = intval(db_fetch_scalar($conn,
                     <input type="checkbox" id="ev-allday" onchange="toggleAllDay()" style="width:16px;height:16px;accent-color:var(--accent)"> All Day
                 </label>
             </div>
-            <div style="display:flex;gap:12px;flex-wrap:wrap">
-                <div class="form-group" style="flex:1;min-width:140px">
+            <div class="ev-datetime-grid">
+                <div class="form-group">
                     <label>Importance</label>
-                    <select id="ev-importance" style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px">
+                    <select id="ev-importance">
                         <option value="low">🟢 Low</option>
                         <option value="normal" selected>🟡 Normal</option>
                         <option value="high">🔴 High</option>
                     </select>
                 </div>
-                <div class="form-group" style="flex:1;min-width:140px">
+                <div class="form-group">
                     <label>Reminder</label>
-                    <select id="ev-reminder" style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px">
+                    <select id="ev-reminder">
                         <option value="0">None</option>
                         <option value="5">5 minutes</option>
                         <option value="15" selected>15 minutes</option>
@@ -138,7 +151,7 @@ $todayCount = intval(db_fetch_scalar($conn,
             </div>
             <div class="form-group">
                 <label>Recurrence</label>
-                <select id="ev-recurrence" style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px" onchange="toggleRecEnd()">
+                <select id="ev-recurrence" onchange="toggleRecEnd()">
                     <option value="">None</option>
                     <option value="DAILY">Daily</option>
                     <option value="WEEKLY">Weekly</option>

@@ -43,13 +43,14 @@
             csrfToken: '<?php echo get_csrf_token(); ?>',
             userId: <?php echo auth_user_id(); ?>,
             pollInterval: <?php echo NOTIFICATION_POLL_INTERVAL; ?>,
+            calWidgetRefresh: <?php echo CALENDAR_WIDGET_REFRESH_INTERVAL; ?>,
             baseUrl: 'index.php',
             currentPage: '<?php echo isset($page) ? $page : ""; ?>'
         };
     </script>
     <script src="assets/js/app.js"></script>
     <script>
-    // Sidebar mini calendar with navigation
+    // Sidebar mini calendar with navigation + auto-refresh
     (function(){
         var container = document.getElementById('sidebar-mini-cal');
         if(!container) return;
@@ -105,7 +106,13 @@
                 });
             }
 
-            // Load event markers
+            // Load event markers for the current view
+            refreshMiniCalEvents();
+        }
+
+        // Refresh only the event markers (dots) without re-rendering the entire calendar
+        function refreshMiniCalEvents(){
+            var last = new Date(miniYear,miniMonth+1,0);
             var s = miniYear+'-'+pad(miniMonth+1)+'-01';
             var e = miniYear+'-'+pad(miniMonth+1)+'-'+pad(last.getDate());
             fetch('api/calendar.php?action=get_events&start='+s+'&end='+e)
@@ -116,11 +123,17 @@
                     for(var i=0;i<data.events.length;i++) eventDates[data.events[i].start_date] = true;
                     var cells = container.querySelectorAll('.mini-cal-day[data-date]');
                     for(var k=0;k<cells.length;k++){
-                        if(eventDates[cells[k].getAttribute('data-date')]) cells[k].classList.add('mini-cal-has-event');
+                        var hasEvent = !!eventDates[cells[k].getAttribute('data-date')];
+                        cells[k].classList.toggle('mini-cal-has-event', hasEvent);
                     }
                 }).catch(function(){});
         }
+
         renderMiniCal();
+
+        // Auto-refresh event markers periodically (preserves user's month/year position)
+        var refreshInterval = (typeof APP_CONFIG !== 'undefined' && APP_CONFIG.calWidgetRefresh) ? APP_CONFIG.calWidgetRefresh : 30000;
+        setInterval(refreshMiniCalEvents, refreshInterval);
     })();
     </script>
 </body>

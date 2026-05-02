@@ -1870,11 +1870,26 @@ body.trash-mode .msg-row.selected {
 
 .modal-body {
     padding: 20px;
-    overflow-y: auto
+    overflow-y: auto;
+    scrollbar-gutter: stable
 }
 
 .modal-body .form-group {
     margin-bottom: 12px
+}
+
+.modal-body select {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: 14px;
+    box-sizing: border-box;
+    -webkit-appearance: menulist;
+    -moz-appearance: menulist;
+    appearance: menulist
 }
 
 .modal-body input {
@@ -1884,7 +1899,8 @@ body.trash-mode .msg-row.selected {
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     color: var(--text);
-    font-size: 14px
+    font-size: 14px;
+    box-sizing: border-box
 }
 
 .modal-body input:focus {
@@ -2541,10 +2557,15 @@ body.trash-mode .msg-row.selected {
     border-radius: var(--radius)
 }
 
+.cal-day-wrapper {
+    position: relative
+}
+
 .cal-hour {
     display: flex;
-    min-height: 50px;
-    border-bottom: 1px solid var(--border)
+    height: 60px;
+    border-bottom: 1px solid var(--border);
+    box-sizing: border-box
 }
 
 .cal-hour:last-child {
@@ -2567,26 +2588,37 @@ body.trash-mode .msg-row.selected {
 
 .cal-hour-content {
     flex: 1;
-    padding: 4px 8px;
-    position: relative;
     cursor: pointer;
-    min-height: 50px
+    height: 100%
 }
 
 .cal-hour-content:hover {
     background: var(--accent-glow)
 }
 
+/* Events overlay – sits on top of the hour grid */
+.cal-events-overlay {
+    position: absolute;
+    top: 0;
+    left: 60px;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 10
+}
+
 .cal-day-event {
-    padding: 6px 10px;
+    padding: 4px 8px;
     border-radius: 6px;
     color: #fff;
     font-size: 12px;
-    margin-bottom: 4px;
     cursor: pointer;
-    transition: all .15s;
-    position: relative;
-    overflow: hidden
+    transition: box-shadow .15s, opacity .15s;
+    overflow: hidden;
+    pointer-events: auto;
+    box-sizing: border-box;
+    border: 1px solid rgba(255,255,255,.15);
+    z-index: 1
 }
 
 .cal-day-event::before {
@@ -2601,8 +2633,9 @@ body.trash-mode .msg-row.selected {
 }
 
 .cal-day-event:hover {
-    transform: translateX(2px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, .2)
+    box-shadow: 0 2px 12px rgba(0, 0, 0, .3);
+    z-index: 20;
+    opacity: .95
 }
 
 .cal-de-title {
@@ -2962,6 +2995,62 @@ body.trash-mode .msg-row.selected {
 
 .mini-cal-today.mini-cal-has-event::after {
     background: #fff
+}
+
+/* Event invitation card (in message body) */
+.cal-invite-card {
+    padding: 20px 24px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin: 8px 0;
+    color: var(--text);
+    font-family: Inter, 'Segoe UI', sans-serif
+}
+
+.cal-invite-icon {
+    font-size: 28px;
+    margin-bottom: 4px
+}
+
+.cal-invite-title {
+    margin: 0 0 16px;
+    color: var(--accent);
+    font-size: 18px;
+    font-weight: 700
+}
+
+.cal-invite-details {
+    border-left: 3px solid var(--accent);
+    padding-left: 14px;
+    margin-bottom: 12px
+}
+
+.cal-invite-row {
+    margin: 6px 0;
+    color: var(--text);
+    font-size: 14px
+}
+
+.cal-invite-label {
+    color: var(--text3);
+    font-weight: 600
+}
+
+.cal-invite-btn {
+    display: inline-block;
+    padding: 8px 20px;
+    background: linear-gradient(135deg, #6366f1, #7c3aed);
+    color: #fff !important;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 13px;
+    transition: opacity .15s
+}
+
+.cal-invite-btn:hover {
+    opacity: .9
 }
 
 /* Login reminder modal */

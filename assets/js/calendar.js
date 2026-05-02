@@ -33,6 +33,7 @@ window.addEventListener('DOMContentLoaded', function(){
     loadEvents();
     setupColorPicker();
     setupAttendeeAutocomplete();
+    setupTimeInputs();
 });
 
 // ── Navigation ──
@@ -147,42 +148,100 @@ window.calDayClick = function(dateStr){
 };
 
 // ── Daily View ──
+var HOUR_HEIGHT = 60; // pixels per hour – keep in sync with CSS .cal-hour height
+
+function timeToMin(t){ var p=t.split(':'); return parseInt(p[0],10)*60+parseInt(p[1],10); }
+
+function assignColumns(evs){
+    var n=evs.length, res=[];
+    for(var i=0;i<n;i++) res.push({col:0,total:1});
+    // assign lowest free column per event
+    for(var i=0;i<n;i++){
+        var iS=timeToMin(evs[i].start_hour), iE=timeToMin(evs[i].end_hour);
+        var used={};
+        for(var j=0;j<i;j++){
+            var jS=timeToMin(evs[j].start_hour), jE=timeToMin(evs[j].end_hour);
+            if(jS<iE && jE>iS) used[res[j].col]=true;
+        }
+        var c=0; while(used[c]) c++;
+        res[i].col=c;
+    }
+    // propagate max columns across each overlap cluster
+    for(var i=0;i<n;i++){
+        var iS=timeToMin(evs[i].start_hour), iE=timeToMin(evs[i].end_hour), mx=res[i].col;
+        for(var j=0;j<n;j++){ if(i===j) continue;
+            var jS=timeToMin(evs[j].start_hour), jE=timeToMin(evs[j].end_hour);
+            if(jS<iE && jE>iS) mx=Math.max(mx,res[j].col);
+        }
+        res[i].total=mx+1;
+    }
+    var changed=true;
+    while(changed){ changed=false;
+        for(var i=0;i<n;i++){
+            var iS=timeToMin(evs[i].start_hour), iE=timeToMin(evs[i].end_hour);
+            for(var j=0;j<n;j++){ if(i===j) continue;
+                var jS=timeToMin(evs[j].start_hour), jE=timeToMin(evs[j].end_hour);
+                if(jS<iE && jE>iS){
+                    var t=Math.max(res[i].total,res[j].total);
+                    if(res[i].total!==t||res[j].total!==t){res[i].total=t;res[j].total=t;changed=true;}
+                }
+            }
+        }
+    }
+    return res;
+}
+
 function renderDay(){
     var dateStr = fmt(viewDate);
     var dayEvents = getEventsForDate(dateStr);
-    var html = '';
+    var now = new Date();
+
+    // Hour grid (background + click targets)
+    var html = '<div class="cal-day-wrapper" style="position:relative;min-height:'+(24*HOUR_HEIGHT)+'px">';
     for(var h=0;h<24;h++){
         var hr = pad(h)+':00';
-        var now = new Date();
         var isCurrentHour = (viewDate.toDateString()===now.toDateString() && now.getHours()===h);
-        html += '<div class="cal-hour'+(isCurrentHour?' cal-hour-now':'')+'">';
+        html += '<div class="cal-hour'+(isCurrentHour?' cal-hour-now':'')+'" style="height:'+HOUR_HEIGHT+'px">';
         html += '<div class="cal-hour-label">'+formatHour(h)+'</div>';
-        html += '<div class="cal-hour-content" onclick="openEventModalAt(\''+dateStr+'\',\''+hr+'\')">';
-        for(var i=0;i<dayEvents.length;i++){
-            var ev = dayEvents[i];
-            var evH = parseInt(ev.start_hour.split(':')[0],10);
-            if(evH===h){
-                var endH = parseInt(ev.end_hour.split(':')[0],10);
-                var span = Math.max(1,endH-evH);
-                html += '<div class="cal-day-event" style="background:'+ev.color+';min-height:'+(span*48)+'px" onclick="event.stopPropagation();showEventDetail('+ev.id+')">';
-                html += '<div class="cal-de-title">'+escH(ev.title)+'</div>';
-                html += '<div class="cal-de-time">'+ev.start_hour+' – '+ev.end_hour+'</div>';
-                if(ev.location) html += '<div class="cal-de-loc">\ud83d\udccd '+escH(ev.location)+'</div>';
-                html += '</div>';
-            }
-        }
-        html += '</div></div>';
+        html += '<div class="cal-hour-content" onclick="openEventModalAt(\''+dateStr+'\',\''+hr+'\')"></div>';
+        html += '</div>';
     }
+
+    // Events overlay – absolutely positioned
+    if(dayEvents.length>0){
+        // sort by start, then longer first
+        dayEvents.sort(function(a,b){
+            var d=timeToMin(a.start_hour)-timeToMin(b.start_hour);
+            if(d!==0) return d;
+            return (timeToMin(b.end_hour)-timeToMin(b.start_hour))-(timeToMin(a.end_hour)-timeToMin(a.start_hour));
+        });
+        var cols = assignColumns(dayEvents);
+        html += '<div class="cal-events-overlay">';
+        for(var i=0;i<dayEvents.length;i++){
+            var ev=dayEvents[i];
+            var sMin=timeToMin(ev.start_hour), eMin=timeToMin(ev.end_hour);
+            var top = sMin/60*HOUR_HEIGHT;
+            var height = Math.max((eMin-sMin)/60*HOUR_HEIGHT, 22);
+            var col=cols[i].col, tot=cols[i].total;
+            var w = (100/tot);
+            var l = col*w;
+            html += '<div class="cal-day-event" style="position:absolute;top:'+top+'px;height:'+height+'px;left:'+l+'%;width:'+(w-0.5)+'%;background:'+ev.color+'" onclick="event.stopPropagation();showEventDetail('+ev.id+')">';
+            html += '<div class="cal-de-title">'+escH(ev.title)+'</div>';
+            html += '<div class="cal-de-time">'+ev.start_hour+' \u2013 '+ev.end_hour+'</div>';
+            if(ev.location) html += '<div class="cal-de-loc">\ud83d\udccd '+escH(ev.location)+'</div>';
+            html += '</div>';
+        }
+        html += '</div>';
+    }
+    html += '</div>';
+
     document.getElementById('cal-timeline').innerHTML = html;
     var timeline = document.getElementById('cal-timeline');
-    if(timeline) timeline.scrollTop = 8*50;
+    if(timeline) timeline.scrollTop = 8*HOUR_HEIGHT;
 }
 
 function formatHour(h){
-    if(h===0) return '12 AM';
-    if(h<12) return h+' AM';
-    if(h===12) return '12 PM';
-    return (h-12)+' PM';
+    return pad(h)+':00';
 }
 
 // ── Agenda View ──
@@ -402,6 +461,14 @@ window.saveEvent = function(){
         showToast('End time must be after start time','error');
         return;
     }
+    // Minimum 10-minute duration
+    if(!isAllDay){
+        var sMin=timeToMin(startTime), eMin=timeToMin(endTime);
+        if(startDate===endDate && (eMin-sMin)<10){
+            showToast('Event must be at least 10 minutes long','error');
+            return;
+        }
+    }
 
     var body = 'title='+enc(title)
         +'&description='+enc(document.getElementById('ev-desc').value)
@@ -461,6 +528,44 @@ window.toggleAllDay = function(){
 window.toggleRecEnd = function(){
     document.getElementById('ev-rec-end-group').style.display = document.getElementById('ev-recurrence').value?'block':'none';
 };
+
+// ── 24h Time Inputs ──
+function setupTimeInputs(){
+    var inputs = document.querySelectorAll('.time-input-24h');
+    for(var i=0;i<inputs.length;i++){
+        (function(inp){
+            // Auto-format: insert colon after 2 digits
+            inp.addEventListener('input',function(e){
+                var v = inp.value.replace(/[^0-9]/g,'');
+                if(v.length>=3) v = v.substring(0,2)+':'+v.substring(2,4);
+                if(v.length>5) v = v.substring(0,5);
+                inp.value = v;
+            });
+            // Validate on blur
+            inp.addEventListener('blur',function(){
+                var v = inp.value.trim();
+                if(!v) return;
+                var m = v.match(/^(\d{1,2}):?(\d{2})$/);
+                if(!m){ inp.value='08:00'; return; }
+                var h=parseInt(m[1],10), mm=parseInt(m[2],10);
+                if(h>23) h=23; if(mm>59) mm=59;
+                inp.value = pad(h)+':'+pad(mm);
+            });
+            // Arrow keys: up/down change time by 15 min
+            inp.addEventListener('keydown',function(e){
+                if(e.key!=='ArrowUp'&&e.key!=='ArrowDown') return;
+                e.preventDefault();
+                var parts = inp.value.split(':');
+                if(parts.length!==2) return;
+                var total = parseInt(parts[0],10)*60+parseInt(parts[1],10);
+                total += (e.key==='ArrowUp'?15:-15);
+                if(total<0) total=1425; // wrap to 23:45
+                if(total>1439) total=0; // wrap to 00:00
+                inp.value = pad(Math.floor(total/60))+':'+pad(total%60);
+            });
+        })(inputs[i]);
+    }
+}
 
 // ── Color Picker ──
 function setupColorPicker(){

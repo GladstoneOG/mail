@@ -94,16 +94,25 @@ case 'create_event':
 
     // Add attendees and send invitations
     $attendeeIds = array();
+    $attendeeNames = array(); // display_name => user_id mapping for invitation
     if ($attendeeStr) {
         $usernames = array_map('trim', explode(',', $attendeeStr));
         $creator = auth_user();
         foreach ($usernames as $uname) {
             if (!$uname) continue;
-            $u = db_fetch_one($conn, "SELECT id FROM mail_users WHERE username = ? AND is_active = 1", array($uname));
+            $u = db_fetch_one($conn, "SELECT id, display_name FROM mail_users WHERE username = ? AND is_active = 1", array($uname));
             if (!$u || intval($u['id']) === $userId) continue;
             $attendeeIds[] = intval($u['id']);
+            $attendeeNames[intval($u['id'])] = $u['display_name'];
             db_execute($conn, "INSERT INTO cal_attendees (event_id,user_id,status,notified) VALUES (?,?,'pending',1)", array($eventId, $u['id']));
-            send_event_invitation($conn, $eventId, $title, $startTime, $endTime, $location, $creator['display_name'], $userId, intval($u['id']));
+        }
+        // Send invitations with other attendee names
+        foreach ($attendeeIds as $aid) {
+            $others = array();
+            foreach ($attendeeNames as $oid => $oname) {
+                if ($oid !== $aid) $others[] = $oname;
+            }
+            send_event_invitation($conn, $eventId, $title, $startTime, $endTime, $location, $creator['display_name'], $userId, $aid, $desc, $others);
         }
     }
 
@@ -154,12 +163,24 @@ case 'update_event':
         }
         // Add new attendees
         $creator = auth_user();
+        // Collect all current attendee names for the invitation
+        $allAttendeeNames = array();
+        foreach ($newUsernames as $un) {
+            $uRow = db_fetch_one($conn, "SELECT id, display_name FROM mail_users WHERE username=? AND is_active=1", array($un));
+            if ($uRow && intval($uRow['id']) !== $userId) {
+                $allAttendeeNames[intval($uRow['id'])] = $uRow['display_name'];
+            }
+        }
         foreach ($newUsernames as $uname) {
             if (!$uname || isset($existingMap[$uname])) continue;
-            $u = db_fetch_one($conn, "SELECT id FROM mail_users WHERE username=? AND is_active=1", array($uname));
+            $u = db_fetch_one($conn, "SELECT id, display_name FROM mail_users WHERE username=? AND is_active=1", array($uname));
             if (!$u || intval($u['id']) === $userId) continue;
             db_execute($conn, "INSERT INTO cal_attendees (event_id,user_id,status,notified) VALUES (?,?,'pending',1)", array($id, $u['id']));
-            send_event_invitation($conn, $id, $title, $startTime, $endTime, $location, $creator['display_name'], $userId, intval($u['id']));
+            $others = array();
+            foreach ($allAttendeeNames as $oid => $oname) {
+                if ($oid !== intval($u['id'])) $others[] = $oname;
+            }
+            send_event_invitation($conn, $id, $title, $startTime, $endTime, $location, $creator['display_name'], $userId, intval($u['id']), $desc, $others);
         }
     }
     json_response(array('success' => true));
@@ -284,24 +305,35 @@ function format_event($ev) {
     );
 }
 
-function send_event_invitation($conn, $eventId, $title, $startTime, $endTime, $location, $creatorName, $senderId, $recipientId) {
+function send_event_invitation($conn, $eventId, $title, $startTime, $endTime, $location, $creatorName, $senderId, $recipientId, $description = '', $otherAttendees = array()) {
     $startFmt = date('l, M j, Y g:i A', strtotime($startTime));
     $endFmt = date('g:i A', strtotime($endTime));
     $eTitle = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
     $eLoc = htmlspecialchars($location, ENT_QUOTES, 'UTF-8');
     $eCreator = htmlspecialchars($creatorName, ENT_QUOTES, 'UTF-8');
-    $locHtml = $location ? "<p style='margin:6px 0;color:#e2e8f0;font-size:14px'><b style='color:#94a3b8'>Where:</b> {$eLoc}</p>" : '';
-    $body = "<div style='padding:20px 24px;background:#12121f;border:1px solid #2a2a45;border-radius:12px;margin:8px 0;color:#e2e8f0;font-family:Inter,Segoe UI,sans-serif'>"
-          . "<div style='font-size:28px;margin-bottom:4px'>📅</div>"
-          . "<h3 style='margin:0 0 16px;color:#818cf8;font-size:18px;font-weight:700'>Event Invitation</h3>"
-          . "<div style='border-left:3px solid #6366f1;padding-left:14px;margin-bottom:12px'>"
-          . "<p style='margin:6px 0;color:#e2e8f0;font-size:14px'><b style='color:#94a3b8'>What:</b> {$eTitle}</p>"
-          . "<p style='margin:6px 0;color:#e2e8f0;font-size:14px'><b style='color:#94a3b8'>When:</b> {$startFmt} – {$endFmt}</p>"
+    $eDesc = htmlspecialchars($description, ENT_QUOTES, 'UTF-8');
+    $locHtml = $location ? "<p class='cal-invite-row'><b class='cal-invite-label'>Where:</b> {$eLoc}</p>" : '';
+    $descHtml = $description ? "<p class='cal-invite-row'><b class='cal-invite-label'>Details:</b> {$eDesc}</p>" : '';
+    $attendeesHtml = '';
+    if (!empty($otherAttendees)) {
+        $names = array();
+        foreach ($otherAttendees as $aName) {
+            $names[] = htmlspecialchars($aName, ENT_QUOTES, 'UTF-8');
+        }
+        $attendeesHtml = "<p class='cal-invite-row'><b class='cal-invite-label'>Also invited:</b> " . implode(', ', $names) . "</p>";
+    }
+    $body = "<div class='cal-invite-card'>"
+          . "<div class='cal-invite-icon'>📅</div>"
+          . "<h3 class='cal-invite-title'>Event Invitation</h3>"
+          . "<div class='cal-invite-details'>"
+          . "<p class='cal-invite-row'><b class='cal-invite-label'>What:</b> {$eTitle}</p>"
+          . "<p class='cal-invite-row'><b class='cal-invite-label'>When:</b> {$startFmt} – {$endFmt}</p>"
           . $locHtml
-          . "<p style='margin:6px 0;color:#e2e8f0;font-size:14px'><b style='color:#94a3b8'>From:</b> {$eCreator}</p>"
+          . "<p class='cal-invite-row'><b class='cal-invite-label'>From:</b> {$eCreator}</p>"
+          . $descHtml
+          . $attendeesHtml
           . "</div>"
-          . "<p style='margin-top:16px;font-size:13px;color:#64748b'>Open the Calendar to respond to this invitation.</p>"
-          . "<p style='margin-top:10px'><a href='index.php?page=calendar' style='display:inline-block;padding:8px 20px;background:linear-gradient(135deg,#6366f1,#7c3aed);color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:13px'>Open Calendar →</a></p>"
+          . "<p style='margin-top:10px'><a href='index.php?page=calendar' class='cal-invite-btn'>Open Calendar →</a></p>"
           . "</div>";
     $subject = "📅 Event Invitation: " . $title;
     $msgId = db_insert_get_id($conn,

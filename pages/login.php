@@ -56,7 +56,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </form>
 
             <div class="auth-footer">
-                Contact your administrator to get an account.
+                <?php if (defined('ALLOW_SELF_REGISTRATION') && ALLOW_SELF_REGISTRATION): ?>
+                    Don't have an account? <a href="index.php?page=register">Create one</a>
+                <?php else: ?>
+                    Contact your administrator to get an account.
+                <?php endif; ?>
             </div>
         </div>
     </div>

@@ -18,6 +18,9 @@ if (!db_table_exists($conn, 'mail_users')) {
 
 $page = isset($_GET['page']) ? $_GET['page'] : 'inbox';
 $publicPages = array('login');
+if (defined('ALLOW_SELF_REGISTRATION') && ALLOW_SELF_REGISTRATION) {
+    $publicPages[] = 'register';
+}
 $validPages = array('login','register','inbox','compose','view','sent','drafts','trash','starred','contacts','profile','admin','outbox','calendar');
 
 if (!in_array($page, $validPages)) {
@@ -29,9 +32,17 @@ if (!in_array($page, $publicPages) && !auth_is_logged_in()) {
     redirect('index.php?page=login');
 }
 
-// Register page is admin-only
-if ($page === 'register' && auth_is_logged_in() && !auth_is_admin()) {
-    redirect('index.php?page=inbox');
+// Register page access control
+if ($page === 'register') {
+    $selfRegAllowed = defined('ALLOW_SELF_REGISTRATION') && ALLOW_SELF_REGISTRATION;
+    // If logged-in non-admin tries to access register, redirect
+    if (auth_is_logged_in() && !auth_is_admin()) {
+        redirect('index.php?page=inbox');
+    }
+    // If not logged in and self-registration is disabled, redirect to login
+    if (!auth_is_logged_in() && !$selfRegAllowed) {
+        redirect('index.php?page=login');
+    }
 }
 
 // If logged in and trying to access login/register, go to inbox
