@@ -70,7 +70,7 @@ $_recentUnread = db_fetch_all($conn,
                         <div class="user-role"><?php echo e(ucfirst($currentUser['role'])); ?></div>
                     </div>
                 </a>
-                <a href="api/auth.php?action=logout" class="logout-btn" title="Logout">Logout</a>
+                <a href="api/auth.php?action=logout" class="logout-btn" title="Logout" onclick="return confirm('Are you sure you want to log out?');">Logout</a>
             </div>
         </aside>
         <main class="main-content">

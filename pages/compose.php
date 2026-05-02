@@ -193,7 +193,7 @@ $allUsers = db_fetch_all($conn, "SELECT id, username, display_name FROM mail_use
     <div class="compose-actions">
         <button type="submit" class="btn btn-primary" id="send-btn"><span>&#x1F4E8;</span> Send Message</button>
         <button type="button" class="btn btn-secondary" id="draft-btn" onclick="saveDraft()"><span>&#x1F4DD;</span> Save Draft</button>
-        <button type="button" class="btn btn-ghost" onclick="if(confirm('Discard?'))window.location='index.php?page=inbox'">Discard</button>
+        <button type="button" class="btn btn-ghost" onclick="if(confirm('Discard message?')) { window.hasUnsavedChanges = false; window.location='index.php?page=inbox'; }">Discard</button>
     </div>
 </form>
 

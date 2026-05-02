@@ -179,7 +179,7 @@ a{color:var(--accent2);text-decoration:none}a:hover{color:#a5b4fc}
 .compose-form label{display:block;font-size:13px;font-weight:500;color:var(--text2);margin-bottom:6px}
 .compose-form input[type="text"],.compose-form textarea{width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;font-family:inherit;transition:border .2s;resize:vertical}
 .compose-form input:focus,.compose-form textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
-.compose-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+.compose-actions{position:sticky;bottom:24px;background:var(--bg2);margin:24px 0 0 auto;padding:12px 16px;border:1px solid var(--border);border-radius:12px;display:flex;gap:10px;flex-wrap:wrap;z-index:10;box-shadow:0 8px 30px rgba(0,0,0,0.3);width:max-content}
 .form-row-toggle{margin-bottom:12px}.toggle-link{font-size:12px;color:var(--accent2)}
 
 /* File Upload */
@@ -301,6 +301,7 @@ a{color:var(--accent2);text-decoration:none}a:hover{color:#a5b4fc}
 [data-theme="light"] .toast-error{background:#fef2f2;color:#991b1b;border-color:#ef4444}
 [data-theme="light"] .toast-info{background:#dbeafe;color:#1e40af;border-color:#3b82f6}
 [data-theme="light"] .rich-editor{background:#fff;color:#1e293b}
+[data-theme="light"] .compose-actions{box-shadow:0 8px 30px rgba(0,0,0,0.1)}
 
 /* Theme Toggle */
 .theme-toggle{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px 10px;cursor:pointer;font-size:16px;color:var(--text);transition:all .2s}

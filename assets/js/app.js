@@ -11,6 +11,7 @@
     // Sync rich editor content to hidden input before submit
     form.addEventListener('submit', function(e) {
         e.preventDefault();
+        window.hasUnsavedChanges = false;
         syncEditorContent();
         sendMessage(false);
     });
@@ -73,6 +74,61 @@
             }
         });
     }
+    // Unsaved changes tracking
+    window.hasUnsavedChanges = false;
+    form.addEventListener('input', function() { window.hasUnsavedChanges = true; });
+    
+    var editor = document.getElementById('editor');
+    if (editor) {
+        editor.addEventListener('input', function() { window.hasUnsavedChanges = true; });
+        editor.addEventListener('keyup', function() { window.hasUnsavedChanges = true; });
+    }
+    
+    window.addEventListener('beforeunload', function(e) {
+        if (window.hasUnsavedChanges) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+
+    var modalHtml = '<div class="modal-overlay" id="unsaved-modal" style="display:none;z-index:9999">' +
+        '<div class="modal" style="max-width:400px;text-align:center">' +
+            '<div class="modal-body" style="padding:24px">' +
+                '<div style="font-size:36px;margin-bottom:12px">&#x26A0;&#xFE0F;</div>' +
+                '<h3>Unsaved Changes</h3>' +
+                '<p style="color:var(--text2);margin-top:8px;font-size:14px">You have an unfinished message. Would you like to save it as a draft?</p>' +
+                '<div style="margin-top:24px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">' +
+                    '<button type="button" class="btn btn-primary" id="unsaved-save-btn">Save Draft</button>' +
+                    '<button type="button" class="btn btn-danger" id="unsaved-leave-btn">Discard</button>' +
+                    '<button type="button" class="btn btn-secondary" onclick="document.getElementById(\'unsaved-modal\').style.display=\'none\'">Cancel</button>' +
+                '</div>' +
+            '</div>' +
+        '</div>' +
+    '</div>';
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    var pendingNavUrl = '';
+    document.getElementById('unsaved-save-btn').addEventListener('click', function() {
+        window.hasUnsavedChanges = false;
+        saveDraft();
+    });
+    document.getElementById('unsaved-leave-btn').addEventListener('click', function() {
+        window.hasUnsavedChanges = false;
+        window.location.href = pendingNavUrl;
+    });
+
+    document.addEventListener('click', function(e) {
+        var a = e.target.closest('a');
+        if (a && a.href && window.hasUnsavedChanges) {
+            if (a.href.indexOf('javascript:') === 0 || a.getAttribute('href').indexOf('#') === 0 || a.target === '_blank') return;
+            // Also ignore if it's the logout button, since that has its own confirm
+            if (a.classList.contains('logout-btn')) return;
+            
+            e.preventDefault();
+            pendingNavUrl = a.href;
+            document.getElementById('unsaved-modal').style.display = 'flex';
+        }
+    });
 })();
 
 function syncEditorContent() {
@@ -114,7 +170,10 @@ function sendMessage(isDraft) {
         });
 }
 
-function saveDraft() { sendMessage(true); }
+function saveDraft() { 
+    window.hasUnsavedChanges = false;
+    sendMessage(true); 
+}
 
 // ============ MESSAGE ACTIONS ============
 function toggleStar(msgId, btn) {
