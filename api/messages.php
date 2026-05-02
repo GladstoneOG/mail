@@ -115,6 +115,8 @@ case 'restore':
     $msgId = isset($_POST['message_id']) ? intval($_POST['message_id']) : 0;
     db_execute($conn, "UPDATE mail_recipients SET is_deleted = 0, deleted_at = NULL WHERE message_id = ? AND recipient_id = ?",
         array($msgId, $userId));
+    db_execute($conn, "UPDATE mail_messages SET sender_deleted = 0 WHERE id = ? AND sender_id = ?",
+        array($msgId, $userId));
     json_response(array('success' => true));
     break;
 

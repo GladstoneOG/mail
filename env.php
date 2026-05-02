@@ -7,7 +7,7 @@ return [
 
     'dev' => [
         'db_type' => 'mssql',
-        'server' => '182.168.0.116',
+        'server' => 'JOHAN\SQLEXPRESS',
         'database' => 'INBOX',
         'username' => 'sa',
         'password' => 'w@tch9u@rd',

@@ -66,8 +66,6 @@ if (isset($_GET['to'])) $prefillTo = $_GET['to'];
 $allUsers = db_fetch_all($conn, "SELECT id, username, display_name FROM mail_users WHERE id != ? AND is_active = 1 ORDER BY display_name", array($userId));
 ?>
 
-<div class="page-header"><h2>Compose Message</h2></div>
-
 <!-- Address Book Modal (#1) -->
 <div class="modal-overlay" id="ab-modal" style="display:none" onclick="if(event.target===this)closeAddressBook()">
     <div class="modal" style="max-width:560px">
@@ -232,6 +230,7 @@ function addCheckedAs(type) {
         checks[i].checked = false;
     }
     field.value = existing.join(', ');
+    window.hasUnsavedChanges = true;
     document.getElementById('ab-select-all').checked = false;
     closeAddressBook();
 }

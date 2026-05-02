@@ -117,6 +117,7 @@ window.customConfirm = function (msg, onConfirm, onCancel, iconHtml) {
                                 input.value = parts.join(', ') + ', ';
                                 dropdown.style.display = 'none';
                                 input.focus();
+                                window.hasUnsavedChanges = true;
                             });
                             dropdown.appendChild(div);
                         });
@@ -572,6 +573,46 @@ function closeNotifOnOutside(e) {
                 }
             }).catch(function () { });
     }
+
+    // ---- Calendar reminder polling ----
+    function checkCalendarReminders() {
+        fetch('api/calendar.php?action=check_reminders')
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.reminders || data.reminders.length === 0) return;
+                for (var i = 0; i < data.reminders.length; i++) {
+                    var rem = data.reminders[i];
+                    var msg = '\uD83D\uDCC5 ' + rem.title + ' in ' + rem.minutes_until + ' min';
+                    showToast(msg, 'info');
+                    playCalendarSound();
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        try {
+                            var n = new Notification('Upcoming Event', { body: rem.title + ' starts in ' + rem.minutes_until + ' minutes', tag: 'cal-' + rem.id });
+                            n.onclick = function () { window.focus(); window.location = 'index.php?page=calendar'; n.close(); };
+                            setTimeout(function () { n.close(); }, 8000);
+                        } catch (e) { }
+                    }
+                    if (!document.hasFocus()) startTitleFlash('\uD83D\uDCC5 ' + rem.title);
+                }
+            }).catch(function () { });
+    }
+
+    function playCalendarSound() {
+        try {
+            var ctx = new (window.AudioContext || window.webkitAudioContext)();
+            function tone(freq, start, dur) {
+                var osc = ctx.createOscillator(); var gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.type = 'triangle'; osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.12, ctx.currentTime + start);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+                osc.start(ctx.currentTime + start); osc.stop(ctx.currentTime + start + dur);
+            }
+            tone(660, 0, 0.2); tone(880, 0.22, 0.2); tone(1100, 0.44, 0.25);
+        } catch (e) { }
+    }
+
+    setInterval(checkCalendarReminders, APP_CONFIG.pollInterval);
 
     setInterval(checkNew, APP_CONFIG.pollInterval);
     checkNew();

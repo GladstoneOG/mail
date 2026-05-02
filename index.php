@@ -18,7 +18,7 @@ if (!db_table_exists($conn, 'mail_users')) {
 
 $page = isset($_GET['page']) ? $_GET['page'] : 'inbox';
 $publicPages = array('login');
-$validPages = array('login','register','inbox','compose','view','sent','drafts','trash','starred','contacts','profile','admin','outbox');
+$validPages = array('login','register','inbox','compose','view','sent','drafts','trash','starred','contacts','profile','admin','outbox','calendar');
 
 if (!in_array($page, $validPages)) {
     $page = 'inbox';

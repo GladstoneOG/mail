@@ -13,6 +13,26 @@ $_recentUnread = db_fetch_all($conn,
      ORDER BY m.sent_at DESC
      OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY",
     array(auth_user_id()));
+
+// Calendar: today's event count for sidebar badge
+$_calTodayCount = 0;
+$_calTodayEvents = array();
+if (db_table_exists($conn, 'cal_events')) {
+    $_calTodayCount = intval(db_fetch_scalar($conn,
+        "SELECT COUNT(*) FROM cal_events e WHERE e.is_cancelled=0 AND CONVERT(DATE,e.start_time)=CONVERT(DATE,GETDATE())
+         AND (e.creator_id=? OR EXISTS(SELECT 1 FROM cal_attendees a WHERE a.event_id=e.id AND a.user_id=? AND a.status!='declined'))",
+        array(auth_user_id(), auth_user_id())));
+    // Fetch today's events for reminder modal (once per session)
+    if (!isset($_SESSION['cal_reminder_shown'])) {
+        $_calTodayEvents = db_fetch_all($conn,
+            "SELECT e.title, e.start_time, e.end_time, e.all_day, e.importance, e.color, e.location
+             FROM cal_events e WHERE e.is_cancelled=0 AND CONVERT(DATE,e.start_time)=CONVERT(DATE,GETDATE())
+             AND (e.creator_id=? OR EXISTS(SELECT 1 FROM cal_attendees a WHERE a.event_id=e.id AND a.user_id=? AND a.status!='declined'))
+             ORDER BY e.start_time",
+            array(auth_user_id(), auth_user_id()));
+        $_SESSION['cal_reminder_shown'] = true;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en" data-theme="<?php echo e($_theme); ?>">
@@ -53,6 +73,11 @@ $_recentUnread = db_fetch_all($conn,
                 <a href="index.php?page=trash" class="nav-item <?php echo $_activePage === 'trash' ? 'active' : ''; ?>">
                     <span class="nav-icon">&#x1F6AE;</span><span class="nav-label">Trash</span>
                 </a>
+                <div class="nav-divider"></div>
+                <a href="index.php?page=calendar" class="nav-item <?php echo $_activePage === 'calendar' ? 'active' : ''; ?>">
+                    <span class="nav-icon">&#x1F4C5;</span><span class="nav-label">Calendar</span>
+                    <?php if ($_calTodayCount > 0): ?><span class="badge"><?php echo $_calTodayCount; ?></span><?php endif; ?>
+                </a>
                 <?php if (auth_is_admin()): ?>
                 <div class="nav-divider"></div>
                 <a href="index.php?page=admin" class="nav-item <?php echo $_activePage === 'admin' ? 'active' : ''; ?>">
@@ -60,6 +85,7 @@ $_recentUnread = db_fetch_all($conn,
                 </a>
                 <?php endif; ?>
             </nav>
+            <div class="sidebar-mini-cal" id="sidebar-mini-cal"></div>
             <div class="sidebar-footer">
                 <a href="index.php?page=profile" class="user-card <?php echo $_activePage === 'profile' ? 'active' : ''; ?>">
                     <div class="avatar-sm" style="background:<?php echo get_avatar_color($currentUser['display_name']); ?>">
@@ -119,24 +145,22 @@ $_recentUnread = db_fetch_all($conn,
 $_listPages = array('inbox', 'starred', 'sent', 'trash', 'drafts');
 $_isListPage = in_array($_activePage, $_listPages);
 ?>
-            <div class="action-bar" id="action-bar">
-                <form class="search-form action-search" method="GET" id="global-search-form">
-                    <input type="hidden" name="page" value="<?php echo e($_activePage); ?>">
-                    <input type="text" name="q" placeholder="Search messages..." value="<?php echo isset($_GET['q']) ? e($_GET['q']) : ''; ?>" class="search-input">
-                    <button type="submit" class="search-btn">&#x1F50D;</button>
-                </form>
 <?php if ($_isListPage): ?>
+            <div class="action-bar" id="action-bar">
                 <div class="action-buttons" id="action-buttons">
-                    <button class="btn btn-ghost btn-sm action-btn" onclick="refreshPage()" title="Refresh">
-                        &#x1F504; <span class="action-label">Refresh</span>
+                    <button class="btn btn-action btn-sm action-btn" onclick="refreshPage()" title="Refresh">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                        <span class="action-label">Refresh</span>
                     </button>
 <?php if (in_array($_activePage, array('inbox', 'starred'))): ?>
-                    <button class="btn btn-ghost btn-sm action-btn" onclick="markAllAsRead()" title="Mark all as read">
-                        &#x2709;&#xFE0F; <span class="action-label">Mark all read</span>
+                    <button class="btn btn-action btn-sm action-btn" onclick="markAllAsRead()" title="Mark all as read">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        <span class="action-label">Mark all read</span>
                     </button>
 <?php endif; ?>
-                    <button class="btn btn-ghost btn-sm action-btn" id="trash-toggle-btn" onclick="toggleTrashMode()" title="<?php echo $_activePage === 'trash' ? 'Select to delete permanently' : 'Select to move to trash'; ?>">
-                        &#x1F5D1;&#xFE0F; <span class="action-label"><?php echo $_activePage === 'trash' ? 'Delete' : 'Trash'; ?></span>
+                    <button class="btn btn-action btn-sm action-btn" id="trash-toggle-btn" onclick="toggleTrashMode()" title="<?php echo $_activePage === 'trash' ? 'Select to delete permanently' : 'Select to move to trash'; ?>">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        <span class="action-label"><?php echo $_activePage === 'trash' ? 'Delete' : 'Trash'; ?></span>
                     </button>
                     <button class="btn btn-danger btn-sm action-btn" id="trash-confirm-btn" onclick="confirmTrashAction()" style="display:none" title="Confirm">
                         &#x2714;&#xFE0F; Confirm
@@ -145,6 +169,11 @@ $_isListPage = in_array($_activePage, $_listPages);
                         &#x274C; Cancel
                     </button>
                 </div>
-<?php endif; ?>
+                <form class="search-form action-search" method="GET" id="global-search-form">
+                    <input type="hidden" name="page" value="<?php echo e($_activePage); ?>">
+                    <input type="text" name="q" placeholder="Search messages..." value="<?php echo isset($_GET['q']) ? e($_GET['q']) : ''; ?>" class="search-input">
+                    <button type="submit" class="search-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></button>
+                </form>
             </div>
+<?php endif; ?>
             <div class="content-area">

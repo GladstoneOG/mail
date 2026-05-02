@@ -5,7 +5,8 @@
 $userId = auth_user_id();
 $search = isset($_GET['q']) ? trim($_GET['q']) : '';
 
-$sql = "SELECT m.id, m.subject, m.body, m.has_attachments, m.sent_at, m.created_at,
+$sql = "SELECT id, subject, body, has_attachments, sent_at, created_at, sender_name, deleted_at FROM (
+    SELECT m.id, m.subject, m.body, m.has_attachments, m.sent_at, m.created_at,
             u.display_name AS sender_name, MAX(mr.deleted_at) AS deleted_at
      FROM mail_recipients mr
      JOIN mail_messages m ON mr.message_id = m.id
@@ -22,7 +23,26 @@ if ($search) {
 }
 
 $sql .= " GROUP BY m.id, m.subject, m.body, m.has_attachments, m.sent_at, m.created_at, u.display_name
-     ORDER BY MAX(mr.deleted_at) DESC";
+
+    UNION
+
+    SELECT m.id, m.subject, m.body, m.has_attachments, m.sent_at, m.created_at,
+            u.display_name AS sender_name, m.sent_at AS deleted_at
+     FROM mail_messages m
+     JOIN mail_users u ON m.sender_id = u.id
+     WHERE m.sender_id = ? AND m.sender_deleted = 1 AND m.is_draft = 0
+     AND m.id NOT IN (SELECT mr2.message_id FROM mail_recipients mr2 WHERE mr2.recipient_id = ? AND mr2.is_deleted = 1)";
+$params[] = $userId;
+$params[] = $userId;
+
+if ($search) {
+    $sql .= " AND (m.subject LIKE ? OR m.body LIKE ? OR u.display_name LIKE ?)";
+    $params[] = $searchLike;
+    $params[] = $searchLike;
+    $params[] = $searchLike;
+}
+
+$sql .= ") AS trash_union ORDER BY deleted_at DESC";
 
 $messages = db_fetch_all($conn, $sql, $params);
 ?>
