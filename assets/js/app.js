@@ -3,13 +3,84 @@
  * ES5 compatible for older browsers
  */
 
+// ============ CUSTOM DIALOG ============
+(function () {
+    var dialogHtml = '<div class="modal-overlay" id="custom-dialog-modal" style="display:none;z-index:10000">' +
+        '<div class="modal" style="max-width:400px;text-align:center">' +
+        '<div class="modal-body" style="padding:24px">' +
+        '<div id="custom-dialog-icon" style="font-size:36px;margin-bottom:12px">&#x26A0;&#xFE0F;</div>' +
+        '<h3 id="custom-dialog-title">Confirm</h3>' +
+        '<p id="custom-dialog-msg" style="color:var(--text2);margin-top:8px;font-size:14px"></p>' +
+        '<div style="margin-top:24px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">' +
+        '<button type="button" class="btn btn-primary" id="custom-dialog-ok">OK</button>' +
+        '<button type="button" class="btn btn-secondary" id="custom-dialog-cancel" style="display:none">Cancel</button>' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+        '</div>';
+
+    function injectDialog() {
+        if (!document.getElementById('custom-dialog-modal')) {
+            document.body.insertAdjacentHTML('beforeend', dialogHtml);
+        }
+    }
+
+    if (document.body) {
+        injectDialog();
+    } else {
+        document.addEventListener('DOMContentLoaded', injectDialog);
+    }
+})();
+
+window.customAlert = function (msg, title) {
+    var modal = document.getElementById('custom-dialog-modal');
+    if (!modal) return;
+    document.getElementById('custom-dialog-title').textContent = title || 'Alert';
+    document.getElementById('custom-dialog-msg').textContent = msg;
+    document.getElementById('custom-dialog-icon').innerHTML = '&#x26A0;&#xFE0F;';
+    var okBtn = document.getElementById('custom-dialog-ok');
+    var cancelBtn = document.getElementById('custom-dialog-cancel');
+    cancelBtn.style.display = 'none';
+    okBtn.className = 'btn btn-primary';
+    okBtn.textContent = 'OK';
+    modal.style.display = 'flex';
+
+    okBtn.onclick = function () {
+        modal.style.display = 'none';
+    };
+};
+
+window.customConfirm = function (msg, onConfirm, onCancel, iconHtml) {
+    var modal = document.getElementById('custom-dialog-modal');
+    if (!modal) return;
+    document.getElementById('custom-dialog-title').textContent = 'Confirm';
+    document.getElementById('custom-dialog-msg').textContent = msg;
+    document.getElementById('custom-dialog-icon').innerHTML = iconHtml || '&#x2753;';
+    var okBtn = document.getElementById('custom-dialog-ok');
+    var cancelBtn = document.getElementById('custom-dialog-cancel');
+    cancelBtn.style.display = 'inline-block';
+    okBtn.className = 'btn btn-danger';
+    okBtn.textContent = 'Yes';
+    cancelBtn.textContent = 'Cancel';
+    modal.style.display = 'flex';
+
+    okBtn.onclick = function () {
+        modal.style.display = 'none';
+        if (onConfirm) onConfirm();
+    };
+    cancelBtn.onclick = function () {
+        modal.style.display = 'none';
+        if (onCancel) onCancel();
+    };
+};
+
 // ============ COMPOSE FORM ============
-(function() {
+(function () {
     var form = document.getElementById('compose-form');
     if (!form) return;
 
     // Sync rich editor content to hidden input before submit
-    form.addEventListener('submit', function(e) {
+    form.addEventListener('submit', function (e) {
         e.preventDefault();
         window.hasUnsavedChanges = false;
         syncEditorContent();
@@ -18,30 +89,30 @@
 
     // Autocomplete for recipient fields
     var recipientFields = ['to', 'cc', 'bcc'];
-    recipientFields.forEach(function(fieldId) {
+    recipientFields.forEach(function (fieldId) {
         var input = document.getElementById(fieldId);
         var dropdown = document.getElementById(fieldId + '-dropdown');
         if (!input || !dropdown) return;
 
         var debounceTimer = null;
-        input.addEventListener('input', function() {
+        input.addEventListener('input', function () {
             clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(function() {
+            debounceTimer = setTimeout(function () {
                 var val = input.value;
                 var parts = val.split(',');
                 var current = parts[parts.length - 1].trim();
                 if (current.length < 1) { dropdown.style.display = 'none'; return; }
 
                 fetch('api/users.php?action=search&q=' + encodeURIComponent(current))
-                    .then(function(r) { return r.json(); })
-                    .then(function(data) {
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
                         if (!data.users || data.users.length === 0) { dropdown.style.display = 'none'; return; }
                         dropdown.innerHTML = '';
-                        data.users.forEach(function(u) {
+                        data.users.forEach(function (u) {
                             var div = document.createElement('div');
                             div.className = 'autocomplete-item';
                             div.innerHTML = '<span class="ac-name">' + escHtml(u.display_name) + '</span><span class="ac-username">@' + escHtml(u.username) + '</span>';
-                            div.addEventListener('click', function() {
+                            div.addEventListener('click', function () {
                                 parts[parts.length - 1] = u.username;
                                 input.value = parts.join(', ') + ', ';
                                 dropdown.style.display = 'none';
@@ -54,7 +125,7 @@
             }, 250);
         });
 
-        document.addEventListener('click', function(e) {
+        document.addEventListener('click', function (e) {
             if (e.target !== input) dropdown.style.display = 'none';
         });
     });
@@ -62,7 +133,7 @@
     // File list display
     var fileInput = document.getElementById('attachments');
     if (fileInput) {
-        fileInput.addEventListener('change', function() {
+        fileInput.addEventListener('change', function () {
             var list = document.getElementById('file-list');
             list.innerHTML = '';
             for (var i = 0; i < this.files.length; i++) {
@@ -76,15 +147,15 @@
     }
     // Unsaved changes tracking
     window.hasUnsavedChanges = false;
-    form.addEventListener('input', function() { window.hasUnsavedChanges = true; });
-    
+    form.addEventListener('input', function () { window.hasUnsavedChanges = true; });
+
     var editor = document.getElementById('editor');
     if (editor) {
-        editor.addEventListener('input', function() { window.hasUnsavedChanges = true; });
-        editor.addEventListener('keyup', function() { window.hasUnsavedChanges = true; });
+        editor.addEventListener('input', function () { window.hasUnsavedChanges = true; });
+        editor.addEventListener('keyup', function () { window.hasUnsavedChanges = true; });
     }
-    
-    window.addEventListener('beforeunload', function(e) {
+
+    window.addEventListener('beforeunload', function (e) {
         if (window.hasUnsavedChanges) {
             e.preventDefault();
             e.returnValue = '';
@@ -93,37 +164,37 @@
 
     var modalHtml = '<div class="modal-overlay" id="unsaved-modal" style="display:none;z-index:9999">' +
         '<div class="modal" style="max-width:400px;text-align:center">' +
-            '<div class="modal-body" style="padding:24px">' +
-                '<div style="font-size:36px;margin-bottom:12px">&#x26A0;&#xFE0F;</div>' +
-                '<h3>Unsaved Changes</h3>' +
-                '<p style="color:var(--text2);margin-top:8px;font-size:14px">You have an unfinished message. Would you like to save it as a draft?</p>' +
-                '<div style="margin-top:24px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">' +
-                    '<button type="button" class="btn btn-primary" id="unsaved-save-btn">Save Draft</button>' +
-                    '<button type="button" class="btn btn-danger" id="unsaved-leave-btn">Discard</button>' +
-                    '<button type="button" class="btn btn-secondary" onclick="document.getElementById(\'unsaved-modal\').style.display=\'none\'">Cancel</button>' +
-                '</div>' +
-            '</div>' +
+        '<div class="modal-body" style="padding:24px">' +
+        '<div style="font-size:36px;margin-bottom:12px">&#x26A0;&#xFE0F;</div>' +
+        '<h3>Unsaved Changes</h3>' +
+        '<p style="color:var(--text2);margin-top:8px;font-size:14px">You have an unfinished message. Would you like to save it as a draft?</p>' +
+        '<div style="margin-top:24px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">' +
+        '<button type="button" class="btn btn-primary" id="unsaved-save-btn">Save Draft</button>' +
+        '<button type="button" class="btn btn-danger" id="unsaved-leave-btn">Discard</button>' +
+        '<button type="button" class="btn btn-secondary" onclick="document.getElementById(\'unsaved-modal\').style.display=\'none\'">Cancel</button>' +
         '</div>' +
-    '</div>';
+        '</div>' +
+        '</div>' +
+        '</div>';
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
     var pendingNavUrl = '';
-    document.getElementById('unsaved-save-btn').addEventListener('click', function() {
+    document.getElementById('unsaved-save-btn').addEventListener('click', function () {
         window.hasUnsavedChanges = false;
         saveDraft();
     });
-    document.getElementById('unsaved-leave-btn').addEventListener('click', function() {
+    document.getElementById('unsaved-leave-btn').addEventListener('click', function () {
         window.hasUnsavedChanges = false;
         window.location.href = pendingNavUrl;
     });
 
-    document.addEventListener('click', function(e) {
+    document.addEventListener('click', function (e) {
         var a = e.target.closest('a');
         if (a && a.href && window.hasUnsavedChanges) {
             if (a.href.indexOf('javascript:') === 0 || a.getAttribute('href').indexOf('#') === 0 || a.target === '_blank') return;
             // Also ignore if it's the logout button, since that has its own confirm
             if (a.classList.contains('logout-btn')) return;
-            
+
             e.preventDefault();
             pendingNavUrl = a.href;
             document.getElementById('unsaved-modal').style.display = 'flex';
@@ -152,27 +223,27 @@ function sendMessage(isDraft) {
     formData.append('is_draft', isDraft ? '1' : '0');
 
     fetch('api/messages.php?action=send', { method: 'POST', body: formData })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
             if (data.error) {
                 showToast(data.error, 'error');
                 if (btn) { btn.disabled = false; btn.textContent = isDraft ? '📝 Save Draft' : '📨 Send Message'; }
             } else {
                 showToast(isDraft ? 'Draft saved!' : 'Message sent!', 'success');
-                setTimeout(function() {
+                setTimeout(function () {
                     window.location = 'index.php?page=' + (isDraft ? 'drafts' : 'sent');
                 }, 800);
             }
         })
-        .catch(function(err) {
+        .catch(function (err) {
             showToast('Network error. Please try again.', 'error');
             if (btn) { btn.disabled = false; btn.textContent = isDraft ? '📝 Save Draft' : '📨 Send Message'; }
         });
 }
 
-function saveDraft() { 
+function saveDraft() {
     window.hasUnsavedChanges = false;
-    sendMessage(true); 
+    sendMessage(true);
 }
 
 // ============ MESSAGE ACTIONS ============
@@ -182,28 +253,29 @@ function toggleStar(msgId, btn) {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: 'action=star&message_id=' + msgId
     })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        if (data.success) {
-            btn.className = data.starred ? 'star-btn starred' : 'star-btn';
-            btn.innerHTML = data.starred ? '&#x2605;' : '&#x2606;';
-        }
-    });
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.success) {
+                btn.className = data.starred ? 'star-btn starred' : 'star-btn';
+                btn.innerHTML = data.starred ? '&#x2605;' : '&#x2606;';
+            }
+        });
 }
 
 function deleteMessage(msgId, backPage) {
-    if (!confirm('Move this message to trash?')) return;
-    fetch('api/messages.php?action=delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'action=delete&message_id=' + msgId
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        if (data.success) {
-            showToast('Message deleted', 'success');
-            setTimeout(function() { window.location = 'index.php?page=' + (backPage || 'inbox'); }, 500);
-        }
+    customConfirm('Move this message to trash?', function () {
+        fetch('api/messages.php?action=delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'action=delete&message_id=' + msgId
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.success) {
+                    showToast('Message deleted', 'success');
+                    setTimeout(function () { window.location = 'index.php?page=' + (backPage || 'inbox'); }, 500);
+                }
+            });
     });
 }
 
@@ -213,54 +285,57 @@ function restoreMessage(msgId) {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: 'action=restore&message_id=' + msgId
     })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        if (data.success) { showToast('Message restored', 'success'); setTimeout(function() { location.reload(); }, 500); }
-    });
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.success) { showToast('Message restored', 'success'); setTimeout(function () { location.reload(); }, 500); }
+        });
 }
 
 function emptyTrash() {
-    if (!confirm('Permanently delete all messages in trash?')) return;
-    fetch('api/messages.php?action=empty_trash', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'action=empty_trash'
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        if (data.success) { showToast('Trash emptied', 'success'); setTimeout(function() { location.reload(); }, 500); }
+    customConfirm('Permanently delete all messages in trash?', function () {
+        fetch('api/messages.php?action=empty_trash', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'action=empty_trash'
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.success) { showToast('Trash emptied', 'success'); setTimeout(function () { location.reload(); }, 500); }
+            });
     });
 }
 
 function deleteDraft(msgId) {
-    if (!confirm('Delete this draft?')) return;
-    fetch('api/messages.php?action=delete_draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'action=delete_draft&message_id=' + msgId
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        if (data.success) { location.reload(); }
+    customConfirm('Delete this draft?', function () {
+        fetch('api/messages.php?action=delete_draft', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'action=delete_draft&message_id=' + msgId
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.success) { location.reload(); }
+            });
     });
 }
 
 // ============ RETRACT / UNSEND ============
 function retractMessage(msgId) {
-    if (!confirm('Retract this message? Recipients will no longer be able to read it.')) return;
-    fetch('api/messages.php?action=retract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'action=retract&message_id=' + msgId
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        if (data.success) {
-            showToast('Message retracted!', 'success');
-            setTimeout(function() { window.location = 'index.php?page=sent'; }, 800);
-        } else {
-            showToast(data.error || 'Failed to retract', 'error');
-        }
+    customConfirm('Retract this message? Recipients will no longer be able to read it.', function () {
+        fetch('api/messages.php?action=retract', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'action=retract&message_id=' + msgId
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.success) {
+                    showToast('Message retracted!', 'success');
+                    setTimeout(function () { window.location = 'index.php?page=sent'; }, 800);
+                } else {
+                    showToast(data.error || 'Failed to retract', 'error');
+                }
+            });
     });
 }
 
@@ -272,7 +347,7 @@ function toggleTheme() {
     html.setAttribute('data-theme', next);
     document.cookie = 'lanmail_theme=' + next + ';path=/;max-age=31536000';
     var btn = document.getElementById('theme-toggle');
-    if (btn) btn.innerHTML = next === 'light' ? '&#x1F319;' : '&#x2600;';
+    if (btn) btn.innerHTML = next === 'light' ? '&#x1F319;' : '&#x1F506;';
 }
 
 // ============ NOTIFICATION DROPDOWN (#3) ============
@@ -283,7 +358,7 @@ function toggleNotifDropdown() {
     dd.classList.toggle('open');
     if (!isOpen) {
         // Close on outside click
-        setTimeout(function() {
+        setTimeout(function () {
             document.addEventListener('click', closeNotifOnOutside);
         }, 10);
     }
@@ -299,7 +374,7 @@ function closeNotifOnOutside(e) {
 }
 
 // ============ NOTIFICATIONS + AUTO-REFRESH ============
-(function() {
+(function () {
     if (typeof APP_CONFIG === 'undefined') return;
 
     var lastUnreadCount = -1;
@@ -310,7 +385,7 @@ function closeNotifOnOutside(e) {
     // ---- Native Notification API (works on HTTPS / localhost only) ----
     function requestNotifPermission() {
         if ('Notification' in window && Notification.permission === 'default') {
-            Notification.requestPermission().then(function(perm) {
+            Notification.requestPermission().then(function (perm) {
                 if (perm === 'granted') {
                     showToast('Desktop notifications enabled!', 'success');
                 }
@@ -326,7 +401,7 @@ function closeNotifOnOutside(e) {
     function startTitleFlash(msg) {
         stopTitleFlash();
         var show = true;
-        titleFlashInterval = setInterval(function() {
+        titleFlashInterval = setInterval(function () {
             document.title = show ? ('\uD83D\uDD14 ' + msg) : originalTitle;
             show = !show;
         }, 1000);
@@ -363,14 +438,14 @@ function closeNotifOnOutside(e) {
             }
             beep(880, 0, 0.15);
             beep(1320, 0.18, 0.2);
-        } catch (e) {}
+        } catch (e) { }
     }
 
     // ---- Main polling ----
     function checkNew() {
         fetch('api/messages.php?action=check_new')
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
                 var badge = document.getElementById('notif-badge');
                 var sidebarBadge = document.querySelector('.nav-item[href*="page=inbox"] .badge');
 
@@ -423,13 +498,13 @@ function closeNotifOnOutside(e) {
                                 tag: 'rspik-mail-' + Date.now(),
                                 icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">📨</text></svg>'
                             });
-                            notif.onclick = function() {
+                            notif.onclick = function () {
                                 window.focus();
                                 window.location = 'index.php?page=inbox';
                                 notif.close();
                             };
-                            setTimeout(function() { notif.close(); }, 6000);
-                        } catch (e) {}
+                            setTimeout(function () { notif.close(); }, 6000);
+                        } catch (e) { }
                     }
 
                     // Auto-refresh the current page's message table
@@ -440,7 +515,7 @@ function closeNotifOnOutside(e) {
                 }
 
                 lastUnreadCount = data.unread || 0;
-            }).catch(function() {});
+            }).catch(function () { });
     }
 
     // Refresh the message table on the current page without a full reload
@@ -451,8 +526,8 @@ function closeNotifOnOutside(e) {
         // Get current URL params for sort/search preservation
         var currentUrl = window.location.href;
         fetch(currentUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-            .then(function(r) { return r.text(); })
-            .then(function(html) {
+            .then(function (r) { return r.text(); })
+            .then(function (html) {
                 // Extract the content-area from the returned HTML
                 var parser = new DOMParser();
                 var doc = parser.parseFromString(html, 'text/html');
@@ -461,14 +536,14 @@ function closeNotifOnOutside(e) {
                 if (newContent && currentContent) {
                     currentContent.innerHTML = newContent.innerHTML;
                 }
-            }).catch(function() {});
+            }).catch(function () { });
     }
 
     // Refresh notification dropdown items
     function refreshNotifDropdown() {
         fetch('api/messages.php?action=notif_list')
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
                 if (!data.items) return;
                 var body = document.querySelector('.notif-dropdown-body');
                 if (!body) return;
@@ -480,12 +555,12 @@ function closeNotifOnOutside(e) {
                     for (var i = 0; i < data.items.length; i++) {
                         var n = data.items[i];
                         html += '<a href="index.php?page=view&id=' + n.id + '" class="notif-item">'
-                              + '<div class="notif-avatar" style="background:' + n.color + '">' + escHtml(n.initials) + '</div>'
-                              + '<div class="notif-info">'
-                              + '<div class="notif-sender">' + escHtml(n.sender_name) + '</div>'
-                              + '<div class="notif-subject">' + escHtml(n.subject) + '</div>'
-                              + '<div class="notif-time">' + escHtml(n.time_ago) + '</div>'
-                              + '</div></a>';
+                            + '<div class="notif-avatar" style="background:' + n.color + '">' + escHtml(n.initials) + '</div>'
+                            + '<div class="notif-info">'
+                            + '<div class="notif-sender">' + escHtml(n.sender_name) + '</div>'
+                            + '<div class="notif-subject">' + escHtml(n.subject) + '</div>'
+                            + '<div class="notif-time">' + escHtml(n.time_ago) + '</div>'
+                            + '</div></a>';
                     }
                     body.innerHTML = html;
                 }
@@ -495,7 +570,7 @@ function closeNotifOnOutside(e) {
                 if (hdr && data.unread_count !== undefined) {
                     hdr.textContent = data.unread_count + ' unread';
                 }
-            }).catch(function() {});
+            }).catch(function () { });
     }
 
     setInterval(checkNew, APP_CONFIG.pollInterval);
@@ -510,10 +585,10 @@ function showToast(msg, type) {
     toast.className = 'toast toast-' + (type || 'info');
     toast.textContent = msg;
     container.appendChild(toast);
-    setTimeout(function() {
+    setTimeout(function () {
         toast.style.opacity = '0';
         toast.style.transition = 'opacity .3s';
-        setTimeout(function() { toast.remove(); }, 300);
+        setTimeout(function () { toast.remove(); }, 300);
     }, 3500);
 }
 
@@ -527,4 +602,135 @@ function formatSize(bytes) {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+// ============ ACTION BAR FUNCTIONS ============
+
+// Row click handler: navigate normally, or toggle checkbox in trash mode
+function handleRowClick(event, msgId, from) {
+    if (document.body.classList.contains('trash-mode')) {
+        var row = event.currentTarget;
+        var cb = row.querySelector('.msg-select-cb');
+        if (cb && event.target !== cb) {
+            cb.checked = !cb.checked;
+        }
+        row.classList.toggle('selected', cb && cb.checked);
+        return;
+    }
+    var url = 'index.php?page=view&id=' + msgId;
+    if (from) url += '&from=' + from;
+    window.location = url;
+}
+
+// Refresh the current page
+function refreshPage() {
+    window.location.reload();
+}
+
+// Mark all as read for current page
+function markAllAsRead() {
+    var page = document.querySelector('.main-content') ? document.querySelector('.main-content').getAttribute('data-page') : 'inbox';
+    fetch('api/messages.php?action=mark_all_read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'action=mark_all_read&page=' + encodeURIComponent(page)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            showToast('All messages marked as read', 'success');
+            setTimeout(function() { window.location.reload(); }, 600);
+        }
+    })
+    .catch(function() {
+        showToast('Failed to mark messages as read', 'error');
+    });
+}
+
+// Toggle trash selection mode
+function toggleTrashMode() {
+    document.body.classList.add('trash-mode');
+    var toggleBtn = document.getElementById('trash-toggle-btn');
+    var confirmBtn = document.getElementById('trash-confirm-btn');
+    var cancelBtn = document.getElementById('trash-cancel-btn');
+    if (toggleBtn) toggleBtn.style.display = 'none';
+    if (confirmBtn) confirmBtn.style.display = 'inline-flex';
+    if (cancelBtn) cancelBtn.style.display = 'inline-flex';
+}
+
+// Cancel trash selection mode
+function cancelTrashMode() {
+    document.body.classList.remove('trash-mode');
+    var toggleBtn = document.getElementById('trash-toggle-btn');
+    var confirmBtn = document.getElementById('trash-confirm-btn');
+    var cancelBtn = document.getElementById('trash-cancel-btn');
+    if (toggleBtn) toggleBtn.style.display = 'inline-flex';
+    if (confirmBtn) confirmBtn.style.display = 'none';
+    if (cancelBtn) cancelBtn.style.display = 'none';
+    // Uncheck all
+    var cbs = document.querySelectorAll('.msg-select-cb');
+    for (var i = 0; i < cbs.length; i++) {
+        cbs[i].checked = false;
+    }
+    var rows = document.querySelectorAll('.msg-row.selected, .message-item.selected');
+    for (var j = 0; j < rows.length; j++) {
+        rows[j].classList.remove('selected');
+    }
+    var selectAll = document.querySelector('.select-all-cb');
+    if (selectAll) selectAll.checked = false;
+}
+
+// Get selected message IDs
+function getSelectedIds() {
+    var cbs = document.querySelectorAll('.msg-select-cb:checked');
+    var ids = [];
+    for (var i = 0; i < cbs.length; i++) {
+        ids.push(cbs[i].value);
+    }
+    return ids;
+}
+
+// Select/deselect all checkboxes
+function toggleSelectAll(masterCb) {
+    var cbs = document.querySelectorAll('.msg-select-cb');
+    for (var i = 0; i < cbs.length; i++) {
+        cbs[i].checked = masterCb.checked;
+        var row = cbs[i].closest('.msg-row') || cbs[i].closest('.message-item');
+        if (row) row.classList.toggle('selected', masterCb.checked);
+    }
+}
+
+// Confirm trash/delete action
+function confirmTrashAction() {
+    var ids = getSelectedIds();
+    if (ids.length === 0) {
+        showToast('No messages selected', 'error');
+        return;
+    }
+    var page = document.querySelector('.main-content') ? document.querySelector('.main-content').getAttribute('data-page') : 'inbox';
+    var isTrashPage = (page === 'trash');
+    var action = isTrashPage ? 'batch_permanent_delete' : 'batch_delete';
+    var confirmMsg = isTrashPage
+        ? 'Permanently delete ' + ids.length + ' selected message(s)?'
+        : 'Move ' + ids.length + ' selected message(s) to trash?';
+
+    customConfirm(confirmMsg, function() {
+        fetch('api/messages.php?action=' + action, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'action=' + action + '&ids=' + ids.join(',')
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                showToast(isTrashPage ? 'Messages permanently deleted' : 'Messages moved to trash', 'success');
+                setTimeout(function() { window.location.reload(); }, 600);
+            } else {
+                showToast(data.error || 'Operation failed', 'error');
+            }
+        })
+        .catch(function() {
+            showToast('Network error. Please try again.', 'error');
+        });
+    });
 }

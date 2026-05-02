@@ -3,14 +3,24 @@
  * Drafts Page
  */
 $userId = auth_user_id();
-$messages = db_fetch_all($conn,
-    "SELECT m.id, m.subject, m.body, m.has_attachments, m.created_at
+$search = isset($_GET['q']) ? trim($_GET['q']) : '';
+
+$sql = "SELECT m.id, m.subject, m.body, m.has_attachments, m.created_at
      FROM mail_messages m
-     WHERE m.sender_id = ? AND m.is_draft = 1
-     ORDER BY m.created_at DESC",
-    array($userId));
+     WHERE m.sender_id = ? AND m.is_draft = 1";
+$params = array($userId);
+
+if ($search) {
+    $sql .= " AND (m.subject LIKE ? OR m.body LIKE ?)";
+    $searchLike = '%' . $search . '%';
+    $params[] = $searchLike;
+    $params[] = $searchLike;
+}
+
+$sql .= " ORDER BY m.created_at DESC";
+
+$messages = db_fetch_all($conn, $sql, $params);
 ?>
-<div class="page-header"><h2>Drafts</h2></div>
 <?php if (empty($messages)): ?>
     <div class="empty-state">
         <div class="empty-icon">&#x1F4DD;</div>
@@ -18,9 +28,10 @@ $messages = db_fetch_all($conn,
         <p>Saved drafts will appear here.</p>
     </div>
 <?php else: ?>
-    <div class="message-list">
+    <div class="message-list" id="msg-table">
         <?php foreach ($messages as $msg): ?>
-            <a href="index.php?page=compose&draft=<?php echo $msg['id']; ?>" class="message-item draft-item">
+            <a href="index.php?page=compose&draft=<?php echo $msg['id']; ?>" class="message-item draft-item" data-msg-id="<?php echo $msg['id']; ?>">
+                <div class="col-select-cell draft-select-cell"><input type="checkbox" class="msg-select-cb" value="<?php echo $msg['id']; ?>" onclick="event.stopPropagation();event.preventDefault()"></div>
                 <div class="msg-avatar" style="background:#92400e">&#x270F;</div>
                 <div class="msg-content">
                     <div class="msg-header-row">

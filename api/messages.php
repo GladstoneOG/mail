@@ -205,6 +205,42 @@ case 'retract':
     json_response(array('success' => true));
     break;
 
+case 'mark_all_read':
+    $page = isset($_POST['page']) ? $_POST['page'] : 'inbox';
+    if ($page === 'inbox') {
+        db_execute($conn, "UPDATE mail_recipients SET is_read = 1, read_at = GETDATE() WHERE recipient_id = ? AND is_read = 0 AND is_deleted = 0 AND message_id IN (SELECT id FROM mail_messages WHERE is_draft = 0)", array($userId));
+    } elseif ($page === 'starred') {
+        db_execute($conn, "UPDATE mail_recipients SET is_read = 1, read_at = GETDATE() WHERE recipient_id = ? AND is_read = 0 AND is_starred = 1 AND is_deleted = 0", array($userId));
+    }
+    json_response(array('success' => true));
+    break;
+
+case 'batch_delete':
+    $ids = isset($_POST['ids']) ? $_POST['ids'] : '';
+    if (!$ids) json_response(array('error' => 'No messages selected'), 400);
+    $idArr = array_map('intval', explode(',', $ids));
+    foreach ($idArr as $mid) {
+        if ($mid <= 0) continue;
+        db_execute($conn, "UPDATE mail_recipients SET is_deleted = 1, deleted_at = GETDATE() WHERE message_id = ? AND recipient_id = ?",
+            array($mid, $userId));
+        db_execute($conn, "UPDATE mail_messages SET sender_deleted = 1 WHERE id = ? AND sender_id = ?",
+            array($mid, $userId));
+    }
+    json_response(array('success' => true));
+    break;
+
+case 'batch_permanent_delete':
+    $ids = isset($_POST['ids']) ? $_POST['ids'] : '';
+    if (!$ids) json_response(array('error' => 'No messages selected'), 400);
+    $idArr = array_map('intval', explode(',', $ids));
+    foreach ($idArr as $mid) {
+        if ($mid <= 0) continue;
+        db_execute($conn, "DELETE FROM mail_recipients WHERE message_id = ? AND recipient_id = ? AND is_deleted = 1",
+            array($mid, $userId));
+    }
+    json_response(array('success' => true));
+    break;
+
 default:
     json_response(array('error' => 'Invalid action'), 400);
 }

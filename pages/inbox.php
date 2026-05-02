@@ -70,17 +70,6 @@ function inbox_sort_link($col, $label, $currentSort, $currentDir, $search) {
 }
 ?>
 
-<div class="page-header">
-    <h2>Inbox</h2>
-    <div class="page-actions">
-        <form class="search-form" method="GET">
-            <input type="hidden" name="page" value="inbox">
-            <input type="text" name="q" placeholder="Search messages..." value="<?php echo e($search); ?>" class="search-input" style="border-radius:var(--radius-sm) 0 0 var(--radius-sm)">
-            <button type="submit" class="search-btn">&#x1F50D;</button>
-        </form>
-    </div>
-</div>
-
 <?php if (empty($messages)): ?>
     <div class="empty-state">
         <div class="empty-icon">&#x1F4ED;</div>
@@ -89,9 +78,10 @@ function inbox_sort_link($col, $label, $currentSort, $currentDir, $search) {
     </div>
 <?php else: ?>
     <div class="msg-table-wrap">
-        <table class="msg-table">
+        <table class="msg-table" id="msg-table">
             <thead>
                 <tr>
+                    <th class="col-select"><input type="checkbox" class="select-all-cb" onchange="toggleSelectAll(this)"></th>
                     <th class="col-star" style="width:36px">&#x2606;</th>
                     <th class="col-from"><?php echo inbox_sort_link('name', 'From', $sort, $dir, $search); ?></th>
                     <th class="col-subject"><?php echo inbox_sort_link('subject', 'Subject', $sort, $dir, $search); ?></th>
@@ -102,7 +92,9 @@ function inbox_sort_link($col, $label, $currentSort, $currentDir, $search) {
             <tbody>
                 <?php foreach ($messages as $msg): ?>
                     <tr class="msg-row <?php echo $msg['is_read'] ? '' : 'unread'; ?>"
-                        onclick="window.location='index.php?page=view&id=<?php echo $msg['id']; ?>'" style="cursor:pointer">
+                        data-msg-id="<?php echo $msg['id']; ?>"
+                        onclick="handleRowClick(event, <?php echo $msg['id']; ?>)" style="cursor:pointer">
+                        <td class="col-select-cell"><input type="checkbox" class="msg-select-cb" value="<?php echo $msg['id']; ?>" onclick="event.stopPropagation()"></td>
                         <td class="col-star-cell">
                             <button class="star-btn <?php echo $msg['is_starred'] ? 'starred' : ''; ?>"
                                     onclick="event.stopPropagation();toggleStar(<?php echo $msg['id']; ?>,this)"

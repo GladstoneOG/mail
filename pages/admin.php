@@ -134,7 +134,7 @@ foreach ($users as $u) { if ($u['is_active']) $activeUsers++; }
                                     <input type="hidden" name="action" value="<?php echo $u['role'] === 'admin' ? 'remove_admin' : 'make_admin'; ?>">
                                     <button class="btn btn-xs btn-secondary"><?php echo $u['role'] === 'admin' ? 'Remove Admin' : 'Make Admin'; ?></button>
                                 </form>
-                                <form method="POST" class="inline-form" onsubmit="return confirm('Reset password to password123?')">
+                                <form method="POST" class="inline-form" onsubmit="event.preventDefault(); var f = this; customConfirm('Reset password to password123?', function() { f.submit(); });">
                                     <input type="hidden" name="user_id" value="<?php echo $u['id']; ?>">
                                     <input type="hidden" name="action" value="reset_password">
                                     <button class="btn btn-xs btn-danger">Reset PW</button>

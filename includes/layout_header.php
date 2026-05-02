@@ -28,12 +28,12 @@ $_recentUnread = db_fetch_all($conn,
         <aside class="sidebar">
             <div class="sidebar-header">
                 <div class="logo">
-                    <span class="logo-icon">&#x1F4E8;</span>
+                    <img src="assets/header_icon.png" class="logo-icon" alt="Logo" style="height: 24px; width: auto; object-fit: contain;">
                     <span class="logo-text"><?php echo e(APP_NAME); ?></span>
                 </div>
             </div>
             <a href="index.php?page=compose" class="compose-btn">
-                <span class="compose-icon">&#x270F;</span> Compose
+                <span class="compose-icon">&#x1F4E7;</span> Compose
             </a>
             <nav class="sidebar-nav">
                 <a href="index.php?page=inbox" class="nav-item <?php echo $_activePage === 'inbox' ? 'active' : ''; ?>">
@@ -70,16 +70,16 @@ $_recentUnread = db_fetch_all($conn,
                         <div class="user-role"><?php echo e(ucfirst($currentUser['role'])); ?></div>
                     </div>
                 </a>
-                <a href="api/auth.php?action=logout" class="logout-btn" title="Logout" onclick="return confirm('Are you sure you want to log out?');">Logout</a>
+                <a href="api/auth.php?action=logout" class="logout-btn" title="Logout" onclick="event.preventDefault(); customConfirm('Are you sure you want to log out?', function() { window.location='api/auth.php?action=logout'; });">Logout</a>
             </div>
         </aside>
-        <main class="main-content">
+        <main class="main-content" data-page="<?php echo e($_activePage); ?>">
             <div class="topbar">
                 <button class="mobile-menu-btn" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#x2630;</button>
                 <div class="topbar-title"><?php echo e(ucfirst($_activePage)); ?></div>
                 <div class="topbar-actions">
                     <button class="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode" id="theme-toggle">
-                        <?php echo $_theme === 'light' ? '&#x1F319;' : '&#x2600;'; ?>
+                        <?php echo $_theme === 'light' ? '&#x1F319;' : '&#x1F506;'; ?>
                     </button>
                     <div class="notif-wrapper" id="notif-wrapper">
                         <button class="notification-bell" id="notification-bell" title="Notifications" onclick="toggleNotifDropdown()">
@@ -114,5 +114,37 @@ $_recentUnread = db_fetch_all($conn,
                         </div>
                     </div>
                 </div>
+            </div>
+<?php
+$_listPages = array('inbox', 'starred', 'sent', 'trash', 'drafts');
+$_isListPage = in_array($_activePage, $_listPages);
+?>
+            <div class="action-bar" id="action-bar">
+                <form class="search-form action-search" method="GET" id="global-search-form">
+                    <input type="hidden" name="page" value="<?php echo e($_activePage); ?>">
+                    <input type="text" name="q" placeholder="Search messages..." value="<?php echo isset($_GET['q']) ? e($_GET['q']) : ''; ?>" class="search-input">
+                    <button type="submit" class="search-btn">&#x1F50D;</button>
+                </form>
+<?php if ($_isListPage): ?>
+                <div class="action-buttons" id="action-buttons">
+                    <button class="btn btn-ghost btn-sm action-btn" onclick="refreshPage()" title="Refresh">
+                        &#x1F504; <span class="action-label">Refresh</span>
+                    </button>
+<?php if (in_array($_activePage, array('inbox', 'starred'))): ?>
+                    <button class="btn btn-ghost btn-sm action-btn" onclick="markAllAsRead()" title="Mark all as read">
+                        &#x2709;&#xFE0F; <span class="action-label">Mark all read</span>
+                    </button>
+<?php endif; ?>
+                    <button class="btn btn-ghost btn-sm action-btn" id="trash-toggle-btn" onclick="toggleTrashMode()" title="<?php echo $_activePage === 'trash' ? 'Select to delete permanently' : 'Select to move to trash'; ?>">
+                        &#x1F5D1;&#xFE0F; <span class="action-label"><?php echo $_activePage === 'trash' ? 'Delete' : 'Trash'; ?></span>
+                    </button>
+                    <button class="btn btn-danger btn-sm action-btn" id="trash-confirm-btn" onclick="confirmTrashAction()" style="display:none" title="Confirm">
+                        &#x2714;&#xFE0F; Confirm
+                    </button>
+                    <button class="btn btn-ghost btn-sm action-btn" id="trash-cancel-btn" onclick="cancelTrashMode()" style="display:none" title="Cancel">
+                        &#x274C; Cancel
+                    </button>
+                </div>
+<?php endif; ?>
             </div>
             <div class="content-area">

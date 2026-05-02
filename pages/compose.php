@@ -193,7 +193,7 @@ $allUsers = db_fetch_all($conn, "SELECT id, username, display_name FROM mail_use
     <div class="compose-actions">
         <button type="submit" class="btn btn-primary" id="send-btn"><span>&#x1F4E8;</span> Send Message</button>
         <button type="button" class="btn btn-secondary" id="draft-btn" onclick="saveDraft()"><span>&#x1F4DD;</span> Save Draft</button>
-        <button type="button" class="btn btn-ghost" onclick="if(confirm('Discard message?')) { window.hasUnsavedChanges = false; window.location='index.php?page=inbox'; }">Discard</button>
+        <button type="button" class="btn btn-ghost" onclick="customConfirm('Discard message?', function() { window.hasUnsavedChanges = false; window.location='index.php?page=inbox'; })">Discard</button>
     </div>
 </form>
 
@@ -218,7 +218,7 @@ function filterAddressBook(q) {
 }
 function addCheckedAs(type) {
     var checks = document.querySelectorAll('.ab-check:checked');
-    if (checks.length === 0) { alert('Select at least one user'); return; }
+    if (checks.length === 0) { customAlert('Select at least one user'); return; }
     var field = document.getElementById(type === 'bcc' || type === 'cc' ? type : 'to');
     if (type === 'cc' || type === 'bcc') {
         document.getElementById('cc-bcc-fields').style.display = 'block';

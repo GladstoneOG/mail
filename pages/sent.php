@@ -5,15 +5,24 @@
 $userId = auth_user_id();
 $pg = isset($_GET['pg']) ? max(1, intval($_GET['pg'])) : 1;
 $offset = ($pg - 1) * ITEMS_PER_PAGE;
+$search = isset($_GET['q']) ? trim($_GET['q']) : '';
 
 $sort = isset($_GET['sort']) ? $_GET['sort'] : 'date';
 $dir = isset($_GET['dir']) ? $_GET['dir'] : 'desc';
 if (!in_array($sort, array('date', 'name', 'subject'))) $sort = 'date';
 if (!in_array($dir, array('asc', 'desc'))) $dir = 'desc';
 
-$total = intval(db_fetch_scalar($conn,
-    "SELECT COUNT(*) FROM mail_messages WHERE sender_id = ? AND is_draft = 0 AND sender_deleted = 0",
-    array($userId)));
+$countSql = "SELECT COUNT(*) FROM mail_messages WHERE sender_id = ? AND is_draft = 0 AND sender_deleted = 0";
+$countParams = array($userId);
+
+if ($search) {
+    $countSql .= " AND (subject LIKE ? OR body LIKE ?)";
+    $searchLike = '%' . $search . '%';
+    $countParams[] = $searchLike;
+    $countParams[] = $searchLike;
+}
+
+$total = intval(db_fetch_scalar($conn, $countSql, $countParams));
 $totalPages = max(1, ceil($total / ITEMS_PER_PAGE));
 
 $orderMap = array(
@@ -24,14 +33,24 @@ $orderMap = array(
 $orderCol = $orderMap[$sort];
 $orderDir = strtoupper($dir);
 
-$messages = db_fetch_all($conn,
-    "SELECT m.id, m.subject, m.body, m.has_attachments, m.sent_at, m.created_at,
+$sql = "SELECT m.id, m.subject, m.body, m.has_attachments, m.sent_at, m.created_at,
             (SELECT TOP 1 u.display_name FROM mail_recipients mr JOIN mail_users u ON mr.recipient_id = u.id WHERE mr.message_id = m.id AND mr.recipient_type = 'to' ORDER BY mr.id) as to_name
      FROM mail_messages m
-     WHERE m.sender_id = ? AND m.is_draft = 0 AND m.sender_deleted = 0
-     ORDER BY $orderCol $orderDir
-     OFFSET ? ROWS FETCH NEXT ? ROWS ONLY",
-    array($userId, $offset, ITEMS_PER_PAGE));
+     WHERE m.sender_id = ? AND m.is_draft = 0 AND m.sender_deleted = 0";
+$params = array($userId);
+
+if ($search) {
+    $sql .= " AND (m.subject LIKE ? OR m.body LIKE ?)";
+    $searchLike = '%' . $search . '%';
+    $params[] = $searchLike;
+    $params[] = $searchLike;
+}
+
+$sql .= " ORDER BY $orderCol $orderDir OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+$params[] = $offset;
+$params[] = ITEMS_PER_PAGE;
+
+$messages = db_fetch_all($conn, $sql, $params);
 
 foreach ($messages as &$msg) {
     if (!$msg['to_name']) $msg['to_name'] = 'Unknown';
@@ -51,10 +70,6 @@ function sent_sort_link($col, $label, $currentSort, $currentDir) {
 }
 ?>
 
-<div class="page-header">
-    <h2>Sent</h2>
-</div>
-
 <?php if (empty($messages)): ?>
     <div class="empty-state">
         <div class="empty-icon">&#x1F4E4;</div>
@@ -63,9 +78,10 @@ function sent_sort_link($col, $label, $currentSort, $currentDir) {
     </div>
 <?php else: ?>
     <div class="msg-table-wrap">
-        <table class="msg-table">
+        <table class="msg-table" id="msg-table">
             <thead>
                 <tr>
+                    <th class="col-select"><input type="checkbox" class="select-all-cb" onchange="toggleSelectAll(this)"></th>
                     <th class="col-from"><?php echo sent_sort_link('name', 'To', $sort, $dir); ?></th>
                     <th class="col-subject"><?php echo sent_sort_link('subject', 'Subject', $sort, $dir); ?></th>
                     <th class="col-attach" style="width:40px" title="Attachments">&#x1F4CE;</th>
@@ -74,7 +90,10 @@ function sent_sort_link($col, $label, $currentSort, $currentDir) {
             </thead>
             <tbody>
                 <?php foreach ($messages as $msg): ?>
-                    <tr class="msg-row" onclick="window.location='index.php?page=view&id=<?php echo $msg['id']; ?>&from=sent'" style="cursor:pointer">
+                    <tr class="msg-row"
+                        data-msg-id="<?php echo $msg['id']; ?>"
+                        onclick="handleRowClick(event, <?php echo $msg['id']; ?>, 'sent')" style="cursor:pointer">
+                        <td class="col-select-cell"><input type="checkbox" class="msg-select-cb" value="<?php echo $msg['id']; ?>" onclick="event.stopPropagation()"></td>
                         <td class="col-from-cell">
                             <div class="user-cell">
                                 <div class="avatar-xs-wrap">
