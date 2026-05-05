@@ -15,7 +15,7 @@ $userId = auth_user_id();
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 $attachId = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
-if ($action === 'download' && $attachId) {
+if (($action === 'download' || $action === 'preview') && $attachId) {
     $att = db_fetch_one($conn, "SELECT a.*, m.sender_id FROM mail_attachments a JOIN mail_messages m ON a.message_id = m.id WHERE a.id = ?", array($attachId));
     if (!$att) { http_response_code(404); exit('Not found'); }
 
@@ -28,7 +28,8 @@ if ($action === 'download' && $attachId) {
     if (!file_exists($filePath)) { http_response_code(404); exit('File not found'); }
 
     header('Content-Type: ' . $att['mime_type']);
-    header('Content-Disposition: attachment; filename="' . str_replace('"', '', $att['original_name']) . '"');
+    $disposition = ($action === 'preview') ? 'inline' : 'attachment';
+    header('Content-Disposition: ' . $disposition . '; filename="' . str_replace('"', '', $att['original_name']) . '"');
     header('Content-Length: ' . filesize($filePath));
     header('Cache-Control: no-cache');
     readfile($filePath);

@@ -883,8 +883,36 @@ body.trash-mode .msg-row {
     cursor: default !important
 }
 
-body.trash-mode .msg-row.selected {
+body.trash-mode .msg-row.selected,
+body.trash-mode .message-item.selected {
     background: rgba(99, 102, 241, .12) !important
+}
+
+body.trash-mode .msg-row:hover,
+body.trash-mode .message-item:hover {
+    background: rgba(99, 102, 241, .08) !important
+}
+
+/* Address Book Rows - clickable to toggle checkbox */
+.ab-row,
+.cal-ab-row {
+    cursor: pointer;
+    transition: background .15s, box-shadow .15s
+}
+
+.ab-row:hover td,
+.cal-ab-row:hover td {
+    background: var(--accent-glow)
+}
+
+.ab-row.selected td,
+.cal-ab-row.selected td {
+    background: rgba(99, 102, 241, .12)
+}
+
+.ab-row.selected:hover td,
+.cal-ab-row.selected:hover td {
+    background: rgba(99, 102, 241, .18)
 }
 
 /* Page Header */
@@ -1414,7 +1442,10 @@ body.trash-mode .msg-row.selected {
 }
 
 .file-list {
-    margin-top: 8px
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 .file-list-item {
@@ -1424,8 +1455,10 @@ body.trash-mode .msg-row.selected {
     padding: 6px 10px;
     background: var(--bg4);
     border-radius: 6px;
-    margin-top: 4px;
-    font-size: 13px
+    margin-top: 0;
+    font-size: 13px;
+    width: 260px;
+    max-width: 100%;
 }
 
 .file-remove {

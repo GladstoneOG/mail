@@ -19,9 +19,26 @@
         '</div>' +
         '</div>';
 
+    var previewModalHtml = '<div class="modal-overlay" id="preview-modal" style="display:none;z-index:10000">' +
+        '<div class="modal" style="max-width:90%;width:800px;height:85vh;display:flex;flex-direction:column;padding:0">' +
+        '<div class="modal-header" style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">' +
+        '<h3 id="preview-title" style="margin:0;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Preview</h3>' +
+        '<button type="button" class="btn btn-ghost btn-sm" onclick="closePreviewModal()" style="font-size:18px;padding:4px 8px">&#x2715;</button>' +
+        '</div>' +
+        '<div class="modal-body" id="preview-content" style="flex:1;padding:0;overflow:hidden;background:var(--bg2);display:flex;align-items:center;justify-content:center">' +
+        '</div>' +
+        '<div class="modal-footer" style="padding:12px 20px;border-top:1px solid var(--border);text-align:right">' +
+        '<a href="#" id="preview-download-btn" class="btn btn-primary" download>&#x1F4E5; Download File</a>' +
+        '</div>' +
+        '</div>' +
+        '</div>';
+
     function injectDialog() {
         if (!document.getElementById('custom-dialog-modal')) {
             document.body.insertAdjacentHTML('beforeend', dialogHtml);
+        }
+        if (!document.getElementById('preview-modal')) {
+            document.body.insertAdjacentHTML('beforeend', previewModalHtml);
         }
     }
 
@@ -72,6 +89,38 @@ window.customConfirm = function (msg, onConfirm, onCancel, iconHtml) {
         modal.style.display = 'none';
         if (onCancel) onCancel();
     };
+};
+
+window.openPreview = function(url, title, ext) {
+    var modal = document.getElementById('preview-modal');
+    if (!modal) return;
+    
+    document.getElementById('preview-title').textContent = title;
+    var content = document.getElementById('preview-content');
+    content.innerHTML = '';
+    
+    var downloadBtn = document.getElementById('preview-download-btn');
+    downloadBtn.href = url.replace('action=preview', 'action=download');
+    
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].indexOf(ext) !== -1) {
+        content.innerHTML = '<img src="' + url + '" style="max-width:100%;max-height:100%;object-fit:contain;">';
+    } else if (ext === 'pdf') {
+        content.innerHTML = '<iframe src="' + url + '" style="width:100%;height:100%;border:none;"></iframe>';
+    } else if (ext === 'txt') {
+        content.innerHTML = '<iframe src="' + url + '" style="width:100%;height:100%;border:none;background:#fff;"></iframe>';
+    } else {
+        content.innerHTML = '<div style="color:var(--text3);padding:20px;">Preview not supported for this file type.</div>';
+    }
+    
+    modal.style.display = 'flex';
+};
+
+window.closePreviewModal = function() {
+    var modal = document.getElementById('preview-modal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.getElementById('preview-content').innerHTML = ''; // Stop media/iframes
+    }
 };
 
 // ============ COMPOSE FORM ============
@@ -131,19 +180,47 @@ window.customConfirm = function (msg, onConfirm, onCancel, iconHtml) {
         });
     });
 
-    // File list display
+    // File list display and queue
+    window.composeFiles = [];
     var fileInput = document.getElementById('attachments');
+    
+    window.renderFileList = function() {
+        var list = document.getElementById('file-list');
+        if (!list) return;
+        list.innerHTML = '';
+        for (var i = 0; i < window.composeFiles.length; i++) {
+            var f = window.composeFiles[i];
+            var div = document.createElement('div');
+            div.className = 'file-list-item';
+            div.innerHTML = '<div style="display:flex;align-items:center;width:100%">' +
+                '<span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + escHtml(f.name) + '">&#x1F4C4; ' + escHtml(f.name) + ' <span style="color:var(--text3);font-size:11px">(' + formatSize(f.size) + ')</span></span>' +
+                '<button type="button" class="btn btn-ghost btn-xs" onclick="removeComposeFile(' + i + ')" style="color:var(--danger);padding:2px 6px;flex-shrink:0;">&#x2715;</button>' +
+                '</div>';
+            list.appendChild(div);
+        }
+    };
+
+    window.removeComposeFile = function(index) {
+        window.composeFiles.splice(index, 1);
+        window.renderFileList();
+    };
+
     if (fileInput) {
         fileInput.addEventListener('change', function () {
-            var list = document.getElementById('file-list');
-            list.innerHTML = '';
             for (var i = 0; i < this.files.length; i++) {
-                var f = this.files[i];
-                var div = document.createElement('div');
-                div.className = 'file-list-item';
-                div.innerHTML = '<span>&#x1F4C4; ' + escHtml(f.name) + '</span><span style="color:var(--text3);font-size:11px">' + formatSize(f.size) + '</span>';
-                list.appendChild(div);
+                var exists = false;
+                for (var j = 0; j < window.composeFiles.length; j++) {
+                    if (window.composeFiles[j].name === this.files[i].name && window.composeFiles[j].size === this.files[i].size) {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (!exists) {
+                    window.composeFiles.push(this.files[i]);
+                }
             }
+            window.renderFileList();
+            this.value = ''; // Reset input so same files can be selected again if removed
         });
     }
     // Unsaved changes tracking
@@ -220,6 +297,19 @@ function sendMessage(isDraft) {
     if (btn) { btn.disabled = true; btn.textContent = isDraft ? 'Saving...' : 'Sending...'; }
 
     var formData = new FormData(form);
+    
+    // Ensure default empty attachments array is cleared if the browser supports it
+    if (typeof formData.delete === 'function') {
+        formData.delete('attachments[]');
+    }
+    
+    // Append accumulated files
+    if (window.composeFiles && window.composeFiles.length > 0) {
+        for (var i = 0; i < window.composeFiles.length; i++) {
+            formData.append('attachments[]', window.composeFiles[i]);
+        }
+    }
+
     formData.append('action', 'send');
     formData.append('is_draft', isDraft ? '1' : '0');
 
@@ -775,3 +865,73 @@ function confirmTrashAction() {
         });
     });
 }
+
+// ============ GLOBAL ESCAPE KEY HANDLER ============
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        // 0. Autocomplete dropdowns
+        var dropdowns = document.querySelectorAll('.autocomplete-dropdown');
+        var dropdownClosed = false;
+        for (var i = 0; i < dropdowns.length; i++) {
+            if (dropdowns[i].style.display === 'block') {
+                dropdowns[i].style.display = 'none';
+                dropdownClosed = true;
+            }
+        }
+        if (dropdownClosed) return;
+
+        // 1. Custom Dialog Modal (Alert/Confirm)
+        var customDialog = document.getElementById('custom-dialog-modal');
+        if (customDialog && customDialog.style.display !== 'none' && customDialog.style.display !== '') {
+            var cancelBtn = document.getElementById('custom-dialog-cancel');
+            var okBtn = document.getElementById('custom-dialog-ok');
+            if (cancelBtn && cancelBtn.style.display !== 'none') {
+                cancelBtn.click();
+            } else if (okBtn) {
+                okBtn.click();
+            }
+            return;
+        }
+
+        // 2. Unsaved Changes Modal
+        var unsavedModal = document.getElementById('unsaved-modal');
+        if (unsavedModal && unsavedModal.style.display !== 'none' && unsavedModal.style.display !== '') {
+            var btns = unsavedModal.querySelectorAll('.btn-secondary');
+            if (btns.length > 0) btns[0].click();
+            return;
+        }
+
+        // 2.5 Preview Modal
+        var previewModal = document.getElementById('preview-modal');
+        if (previewModal && previewModal.style.display !== 'none' && previewModal.style.display !== '') {
+            if (typeof closePreviewModal === 'function') closePreviewModal();
+            return;
+        }
+
+        // 3. Address Book Modals
+        var abModal = document.getElementById('ab-modal');
+        if (abModal && abModal.style.display !== 'none' && abModal.style.display !== '') {
+            if (typeof closeAddressBook === 'function') closeAddressBook();
+            return;
+        }
+        var calAbModal = document.getElementById('cal-ab-modal');
+        if (calAbModal && calAbModal.style.display !== 'none' && calAbModal.style.display !== '') {
+            if (typeof closeCalAB === 'function') closeCalAB();
+            return;
+        }
+
+        // 4. Calendar Event Modal
+        var eventModal = document.getElementById('event-modal');
+        if (eventModal && eventModal.style.display !== 'none' && eventModal.style.display !== '') {
+            if (typeof closeEventModal === 'function') closeEventModal();
+            return;
+        }
+        
+        // 5. Contact Modal
+        var contactModal = document.getElementById('contact-modal');
+        if (contactModal && contactModal.style.display !== 'none' && contactModal.style.display !== '') {
+            if (typeof closeContactModal === 'function') closeContactModal();
+            return;
+        }
+    }
+});

@@ -30,7 +30,7 @@ $messages = db_fetch_all($conn, $sql, $params);
 <?php else: ?>
     <div class="message-list" id="msg-table">
         <?php foreach ($messages as $msg): ?>
-            <a href="index.php?page=compose&draft=<?php echo $msg['id']; ?>" class="message-item draft-item" data-msg-id="<?php echo $msg['id']; ?>">
+            <a href="index.php?page=compose&draft=<?php echo $msg['id']; ?>" class="message-item draft-item" data-msg-id="<?php echo $msg['id']; ?>" onclick="if(document.body.classList.contains('trash-mode')){event.preventDefault();var cb=this.querySelector('.msg-select-cb');if(cb&&event.target!==cb){cb.checked=!cb.checked;}this.classList.toggle('selected',cb&&cb.checked);}">
                 <div class="col-select-cell draft-select-cell"><input type="checkbox" class="msg-select-cb" value="<?php echo $msg['id']; ?>" onclick="event.stopPropagation();event.preventDefault()"></div>
                 <div class="msg-avatar" style="background:#92400e">&#x270F;</div>
                 <div class="msg-content">

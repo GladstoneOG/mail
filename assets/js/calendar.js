@@ -275,11 +275,7 @@ function renderAgenda(){
                 if(ev.location) html += ' \u00b7 \ud83d\udccd '+escH(ev.location);
                 if(ev.attendee_count>0) html += ' \u00b7 \ud83d\udc65 '+ev.attendee_count;
                 html += '</div></div>';
-                if(ev.my_status && !ev.is_mine){
-                    var st = ev.my_status;
-                    var stCls = st==='accepted'?'cal-rsvp-yes':st==='declined'?'cal-rsvp-no':'cal-rsvp-pending';
-                    html += '<span class="cal-rsvp '+stCls+'">'+st.charAt(0).toUpperCase()+st.slice(1)+'</span>';
-                }
+
                 html += '</div>';
             }
         }
@@ -307,17 +303,9 @@ window.showEventDetail = function(id){
                 html += '<div class="cal-detail-section"><h4>Attendees ('+ev.attendees.length+')</h4>';
                 for(var i=0;i<ev.attendees.length;i++){
                     var a = ev.attendees[i];
-                    var sIcon = a.status==='accepted'?'\u2705':a.status==='declined'?'\u274c':a.status==='tentative'?'\ud83e\udd14':'\u2753';
                     html += '<div class="cal-att-row"><div class="avatar-xs" style="background:'+a.color+'">'+escH(a.initials)+'</div>';
-                    html += '<span>'+escH(a.display_name)+'</span><span class="cal-att-status">'+sIcon+' '+a.status+'</span></div>';
+                    html += '<span>'+escH(a.display_name)+'</span></div>';
                 }
-                html += '</div>';
-            }
-            if(ev.my_status && !ev.is_mine){
-                html += '<div class="cal-rsvp-actions">';
-                html += '<button class="btn btn-sm btn-success'+(ev.my_status==='accepted'?' btn-active':'')+'" onclick="rsvpEvent('+ev.id+',\'accepted\')">\u2705 Accept</button>';
-                html += '<button class="btn btn-sm btn-warning'+(ev.my_status==='tentative'?' btn-active':'')+'" onclick="rsvpEvent('+ev.id+',\'tentative\')">\ud83e\udd14 Tentative</button>';
-                html += '<button class="btn btn-sm btn-danger'+(ev.my_status==='declined'?' btn-active':'')+'" onclick="rsvpEvent('+ev.id+',\'declined\')">\u274c Decline</button>';
                 html += '</div>';
             }
             if(ev.is_mine){
@@ -332,14 +320,7 @@ window.showEventDetail = function(id){
 };
 window.closeDetail = function(){ document.getElementById('cal-event-detail').style.display='none'; };
 
-window.rsvpEvent = function(id, status){
-    fetch('api/calendar.php?action=respond',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
-        body:'event_id='+id+'&status='+status})
-        .then(function(r){return r.json();})
-        .then(function(d){
-            if(d.success){showToast('RSVP: '+status,'success');showEventDetail(id);loadEvents();}
-        });
-};
+
 
 // ── Event Modal ──
 function getViewDateStr(){ return fmt(viewDate); }
@@ -352,7 +333,6 @@ window.openEventModal = function(){
     // If in daily view, use that date; otherwise use today
     var dateStr = (currentView==='day') ? getViewDateStr() : fmt(new Date());
     document.getElementById('ev-start-date').value = dateStr;
-    document.getElementById('ev-end-date').value = dateStr;
     document.getElementById('ev-start-time').value = '08:00';
     document.getElementById('ev-end-time').value = '09:00';
     document.getElementById('ev-start-time-group').style.display = '';
@@ -374,7 +354,6 @@ window.openEventModal = function(){
 window.openEventModalAt = function(dateStr, time){
     openEventModal();
     document.getElementById('ev-start-date').value = dateStr;
-    document.getElementById('ev-end-date').value = dateStr;
     document.getElementById('ev-start-time').value = time;
     var h = parseInt(time.split(':')[0],10);
     document.getElementById('ev-end-time').value = pad(h+1)+':00';
@@ -414,11 +393,7 @@ window.editEvent = function(id){
             document.getElementById('ev-location').value = ev.location||'';
             document.getElementById('ev-start-date').value = ev.start_date;
             document.getElementById('ev-start-time').value = ev.start_hour;
-            // Parse end date from end_time
-            var endDate = ev.end_time.substring(0,10);
-            var endHour = ev.end_hour;
-            document.getElementById('ev-end-date').value = endDate;
-            document.getElementById('ev-end-time').value = endHour;
+            document.getElementById('ev-end-time').value = ev.end_hour;
             var isAllDay = !!ev.all_day;
             document.getElementById('ev-allday').checked = isAllDay;
             document.getElementById('ev-start-time-group').style.display = isAllDay?'none':'';
@@ -443,11 +418,10 @@ window.saveEvent = function(){
     if(!title){showToast('Title is required','error');return;}
     var isAllDay = document.getElementById('ev-allday').checked;
     var startDate = document.getElementById('ev-start-date').value;
-    var endDate = document.getElementById('ev-end-date').value;
     var startTime = isAllDay ? '08:00' : document.getElementById('ev-start-time').value;
     var endTime = isAllDay ? '17:00' : document.getElementById('ev-end-time').value;
     var fullStart = startDate + ' ' + startTime + ':00';
-    var fullEnd = endDate + ' ' + endTime + ':00';
+    var fullEnd = startDate + ' ' + endTime + ':00';
     // Prevent creating events in the past (only for new events)
     if(!id){
         var now = new Date();
@@ -464,7 +438,7 @@ window.saveEvent = function(){
     // Minimum 10-minute duration
     if(!isAllDay){
         var sMin=timeToMin(startTime), eMin=timeToMin(endTime);
-        if(startDate===endDate && (eMin-sMin)<10){
+        if((eMin-sMin)<10){
             showToast('Event must be at least 10 minutes long','error');
             return;
         }
@@ -520,7 +494,6 @@ window.toggleAllDay = function(){
         // Set to today with 08:00-17:00
         var today = fmt(new Date());
         document.getElementById('ev-start-date').value = today;
-        document.getElementById('ev-end-date').value = today;
         document.getElementById('ev-start-time').value = '08:00';
         document.getElementById('ev-end-time').value = '17:00';
     }
@@ -624,7 +597,11 @@ window.filterCalAB = function(q){
 };
 window.calAbToggleAll = function(checked){
     var rows=document.querySelectorAll('.cal-ab-row');
-    for(var i=0;i<rows.length;i++){if(rows[i].style.display!=='none')rows[i].querySelector('.cal-ab-check').checked=checked;}
+    for(var i=0;i<rows.length;i++){if(rows[i].style.display!=='none'){rows[i].querySelector('.cal-ab-check').checked=checked;rows[i].classList.toggle('selected',checked);}}
+};
+window.calAbRowClick = function(row, event){
+    var cb=row.querySelector('.cal-ab-check');
+    if(cb){cb.checked=!cb.checked;row.classList.toggle('selected',cb.checked);}
 };
 window.addCalABChecked = function(){
     var checks=document.querySelectorAll('.cal-ab-check:checked');
@@ -635,6 +612,7 @@ window.addCalABChecked = function(){
     for(var i=0;i<checks.length;i++){
         if(existing.indexOf(checks[i].value)===-1) existing.push(checks[i].value);
         checks[i].checked=false;
+        var row=checks[i].closest('.cal-ab-row');if(row)row.classList.remove('selected');
     }
     field.value=existing.join(', ');
     document.getElementById('cal-ab-select-all').checked=false;

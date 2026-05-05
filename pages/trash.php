@@ -66,7 +66,8 @@ $messages = db_fetch_all($conn, $sql, $params);
             </thead>
             <tbody>
                 <?php foreach ($messages as $msg): ?>
-                    <tr class="msg-row" data-msg-id="<?php echo $msg['id']; ?>">
+                    <tr class="msg-row" data-msg-id="<?php echo $msg['id']; ?>"
+                        onclick="handleRowClick(event, <?php echo $msg['id']; ?>, 'trash')" style="cursor:pointer">
                         <td class="col-select-cell"><input type="checkbox" class="msg-select-cb" value="<?php echo $msg['id']; ?>" onclick="event.stopPropagation()"></td>
                         <td class="col-from-cell">
                             <div class="user-cell">

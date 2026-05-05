@@ -87,8 +87,8 @@ $allUsers = db_fetch_all($conn, "SELECT id, username, display_name FROM mail_use
                 </thead>
                 <tbody>
                     <?php foreach ($allUsers as $u): ?>
-                        <tr class="ab-row" data-search="<?php echo e(strtolower($u['display_name'] . ' ' . $u['username'])); ?>">
-                            <td><input type="checkbox" class="ab-check" value="<?php echo e($u['username']); ?>"></td>
+                        <tr class="ab-row" data-search="<?php echo e(strtolower($u['display_name'] . ' ' . $u['username'])); ?>" onclick="abRowClick(this, event)">
+                            <td><input type="checkbox" class="ab-check" value="<?php echo e($u['username']); ?>" onclick="event.stopPropagation()"></td>
                             <td>
                                 <div class="user-cell">
                                     <div class="avatar-xs" style="background:<?php echo get_avatar_color($u['display_name']); ?>"><?php echo e(get_initials($u['display_name'])); ?></div>
@@ -228,6 +228,8 @@ function addCheckedAs(type) {
         var uname = checks[i].value;
         if (existing.indexOf(uname) === -1) existing.push(uname);
         checks[i].checked = false;
+        var row = checks[i].closest('.ab-row');
+        if (row) row.classList.remove('selected');
     }
     field.value = existing.join(', ');
     window.hasUnsavedChanges = true;
@@ -239,7 +241,15 @@ function abToggleAll(checked) {
     for (var i = 0; i < rows.length; i++) {
         if (rows[i].style.display !== 'none') {
             rows[i].querySelector('.ab-check').checked = checked;
+            rows[i].classList.toggle('selected', checked);
         }
+    }
+}
+function abRowClick(row, event) {
+    var cb = row.querySelector('.ab-check');
+    if (cb) {
+        cb.checked = !cb.checked;
+        row.classList.toggle('selected', cb.checked);
     }
 }
 

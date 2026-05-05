@@ -70,7 +70,7 @@ $todayCount = intval(db_fetch_scalar($conn,
 </div>
 
 <!-- Event Create/Edit Modal -->
-<div class="modal-overlay" id="event-modal" style="display:none" onclick="if(event.target===this)closeEventModal()">
+<div class="modal-overlay" id="event-modal" style="display:none">
     <div class="modal" style="max-width:580px">
         <div class="modal-header">
             <h3 id="event-modal-title">&#x1F4C5; New Event</h3>
@@ -90,18 +90,14 @@ $todayCount = intval(db_fetch_scalar($conn,
                 <label>Location</label>
                 <input type="text" id="ev-location" placeholder="Location (optional)">
             </div>
-            <div class="ev-datetime-grid">
+            <div class="ev-datetime-grid" style="grid-template-columns:1fr 1fr 1fr">
                 <div class="form-group">
-                    <label>Start Date</label>
+                    <label>Date</label>
                     <input type="date" id="ev-start-date">
                 </div>
                 <div class="form-group" id="ev-start-time-group">
                     <label>Start Time</label>
                     <input type="text" id="ev-start-time" value="08:00" placeholder="HH:MM" maxlength="5" class="time-input-24h">
-                </div>
-                <div class="form-group">
-                    <label>End Date</label>
-                    <input type="date" id="ev-end-date">
                 </div>
                 <div class="form-group" id="ev-end-time-group">
                     <label>End Time</label>
@@ -163,7 +159,7 @@ $todayCount = intval(db_fetch_scalar($conn,
                 <label>Recurrence End Date</label>
                 <input type="date" id="ev-rec-end">
             </div>
-            <div class="form-group">
+            <div class="form-group" style="position:relative;">
                 <label>Invite Attendees</label>
                 <div class="to-input-row">
                     <button type="button" class="ab-open-btn" onclick="openCalAB()" title="Address Book">&#x1F4D6;</button>
@@ -195,8 +191,8 @@ $todayCount = intval(db_fetch_scalar($conn,
                 <thead><tr><th style="width:36px"><input type="checkbox" id="cal-ab-select-all" onchange="calAbToggleAll(this.checked)"></th><th>User</th><th>Username</th></tr></thead>
                 <tbody>
                     <?php foreach ($allUsers as $u): ?>
-                    <tr class="cal-ab-row" data-search="<?php echo e(strtolower($u['display_name'].' '.$u['username'])); ?>">
-                        <td><input type="checkbox" class="cal-ab-check" value="<?php echo e($u['username']); ?>"></td>
+                    <tr class="cal-ab-row" data-search="<?php echo e(strtolower($u['display_name'].' '.$u['username'])); ?>" onclick="calAbRowClick(this, event)">
+                        <td><input type="checkbox" class="cal-ab-check" value="<?php echo e($u['username']); ?>" onclick="event.stopPropagation();var r=this.closest('.cal-ab-row');if(r)r.classList.toggle('selected',this.checked)"></td>
                         <td><div class="user-cell"><div class="avatar-xs" style="background:<?php echo get_avatar_color($u['display_name']); ?>"><?php echo e(get_initials($u['display_name'])); ?></div><?php echo e($u['display_name']); ?></div></td>
                         <td>@<?php echo e($u['username']); ?></td>
                     </tr>

@@ -27,6 +27,8 @@ if ($recipRow && !$recipRow['is_read']) {
     db_execute($conn, "UPDATE mail_recipients SET is_read = 1, read_at = GETDATE() WHERE message_id = ? AND recipient_id = ?",
                array($msgId, $userId));
     // Check if ALL recipients have now read — if so, delete physical attachment files
+    // (Suspended to allow previewing attachments indefinitely)
+    /*
     $unreadLeft = intval(db_fetch_scalar($conn,
         "SELECT COUNT(*) FROM mail_recipients WHERE message_id = ? AND is_read = 0", array($msgId)));
     if ($unreadLeft === 0 && $msg['has_attachments']) {
@@ -36,6 +38,7 @@ if ($recipRow && !$recipRow['is_read']) {
             if (file_exists($path)) @unlink($path);
         }
     }
+    */
 }
 
 // Get recipients
@@ -104,12 +107,24 @@ $backPage = isset($_GET['from']) ? $_GET['from'] : 'inbox';
                 <?php foreach ($attachments as $att):
                     $fileExists = file_exists(UPLOAD_DIR . $att['stored_name']);
                 ?>
-                    <?php if ($fileExists): ?>
-                        <a href="api/attachments.php?action=download&id=<?php echo $att['id']; ?>" class="attachment-item">
-                            <span class="att-icon">&#x1F4C4;</span>
-                            <span class="att-name"><?php echo e($att['original_name']); ?></span>
-                            <span class="att-size"><?php echo format_size($att['file_size']); ?></span>
-                        </a>
+                    <?php if ($fileExists): 
+                        $ext = strtolower(pathinfo($att['original_name'], PATHINFO_EXTENSION));
+                        $isPreviewable = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'txt']);
+                        $previewUrl = "api/attachments.php?action=preview&id=" . $att['id'];
+                        $downloadUrl = "api/attachments.php?action=download&id=" . $att['id'];
+                    ?>
+                        <div class="attachment-item" style="padding:0; overflow:hidden; display:flex; align-items:stretch;">
+                            <a href="<?php echo $isPreviewable ? 'javascript:void(0)' : $downloadUrl; ?>" 
+                               <?php if($isPreviewable) echo 'onclick="openPreview(\''.$previewUrl.'\', \''.e(addslashes($att['original_name'])).'\', \''.$ext.'\')"'; ?>
+                               style="display:flex; align-items:center; gap:8px; padding:8px 14px; flex:1; text-decoration:none; color:var(--text);">
+                                <span class="att-icon">&#x1F4C4;</span>
+                                <span class="att-name"><?php echo e($att['original_name']); ?></span>
+                                <span class="att-size"><?php echo format_size($att['file_size']); ?></span>
+                            </a>
+                            <a href="<?php echo $downloadUrl; ?>" title="Download" style="display:flex; align-items:center; justify-content:center; padding:0 12px; border-left:1px solid var(--border); text-decoration:none; color:var(--text2); transition:background 0.15s;" onmouseover="this.style.background='var(--accent-glow)';" onmouseout="this.style.background='transparent';">
+                                &#x1F4E5;
+                            </a>
+                        </div>
                     <?php else: ?>
                         <span class="attachment-item att-removed" title="File removed after all recipients read this message">
                             <span class="att-icon">&#x1F6AB;</span>
