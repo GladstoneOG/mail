@@ -40,7 +40,7 @@ window.addEventListener('DOMContentLoaded', function(){
 window.calNav = function(dir){
     if(currentView==='month') viewDate.setMonth(viewDate.getMonth()+dir);
     else if(currentView==='day') viewDate.setDate(viewDate.getDate()+dir);
-    else viewDate.setDate(viewDate.getDate()+(dir*30));
+    else viewDate.setFullYear(viewDate.getFullYear()+dir);
     loadEvents();
 };
 window.calToday = function(){ viewDate = new Date(); loadEvents(); };
@@ -51,7 +51,7 @@ window.switchView = function(v, btn){
     document.getElementById('cal-month-view').style.display = v==='month'?'':'none';
     document.getElementById('cal-day-view').style.display = v==='day'?'':'none';
     document.getElementById('cal-agenda-view').style.display = v==='agenda'?'':'none';
-    renderView();
+    loadEvents();
 };
 
 function updateTitle(){
@@ -76,8 +76,8 @@ function loadEvents(){
         start = new Date(viewDate); start.setHours(0,0,0,0);
         end = new Date(viewDate); end.setHours(23,59,59,999);
     } else {
-        start = new Date(); start.setHours(0,0,0,0);
-        end = new Date(); end.setDate(end.getDate()+30);
+        start = new Date(viewDate); start.setHours(0,0,0,0);
+        end = new Date(viewDate); end.setDate(end.getDate()+365); end.setHours(23,59,59,999);
     }
     var s = fmt(start), e = fmt(end);
     fetch('api/calendar.php?action=get_events&start='+s+'&end='+e)

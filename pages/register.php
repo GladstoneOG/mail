@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="auth-container">
         <div class="auth-card">
             <div class="auth-header">
-                <div class="auth-logo">&#x1F4E8;</div>
+                <div class="auth-logo"><img src="assets/header_icon.png" alt="Logo" style="height:60px; width:auto;"></div>
                 <h1><?php echo e(APP_NAME); ?></h1>
                 <p class="auth-subtitle">Create your account</p>
             </div>

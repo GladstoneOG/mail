@@ -3017,7 +3017,7 @@ body.trash-mode .message-item:hover {
 .mini-cal-has-event::after {
     content: '';
     position: absolute;
-    bottom: 0;
+    bottom: 6px;
     left: 50%;
     transform: translateX(-50%);
     width: 4px;

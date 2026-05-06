@@ -54,8 +54,16 @@
     (function(){
         var container = document.getElementById('sidebar-mini-cal');
         if(!container) return;
-        var miniMonth = new Date().getMonth();
-        var miniYear = new Date().getFullYear();
+        
+        var initDate = new Date();
+        var urlParams = new URLSearchParams(window.location.search);
+        var urlDate = urlParams.get('date');
+        if (urlDate && /^\d{4}-\d{2}-\d{2}$/.test(urlDate)) {
+            var parts = urlDate.split('-');
+            initDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        }
+        var miniMonth = initDate.getMonth();
+        var miniYear = initDate.getFullYear();
 
         function pad(n){return n<10?'0'+n:''+n;}
 
