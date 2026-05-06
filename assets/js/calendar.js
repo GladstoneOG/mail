@@ -29,6 +29,9 @@ window.addEventListener('DOMContentLoaded', function(){
         document.querySelectorAll('.cal-tab').forEach(function(t){t.classList.remove('active');});
         var agTab = document.querySelector('.cal-tab[data-view="agenda"]');
         if(agTab) agTab.classList.add('active');
+        if(document.getElementById('cal-prev')) document.getElementById('cal-prev').style.display = 'none';
+        if(document.getElementById('cal-today-btn')) document.getElementById('cal-today-btn').style.display = 'none';
+        if(document.getElementById('cal-next')) document.getElementById('cal-next').style.display = 'none';
     }
     loadEvents();
     setupColorPicker();
@@ -51,6 +54,12 @@ window.switchView = function(v, btn){
     document.getElementById('cal-month-view').style.display = v==='month'?'':'none';
     document.getElementById('cal-day-view').style.display = v==='day'?'':'none';
     document.getElementById('cal-agenda-view').style.display = v==='agenda'?'':'none';
+    
+    var showNav = (v !== 'agenda') ? '' : 'none';
+    if(document.getElementById('cal-prev')) document.getElementById('cal-prev').style.display = showNav;
+    if(document.getElementById('cal-today-btn')) document.getElementById('cal-today-btn').style.display = showNav;
+    if(document.getElementById('cal-next')) document.getElementById('cal-next').style.display = showNav;
+
     loadEvents();
 };
 
