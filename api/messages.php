@@ -25,6 +25,7 @@ case 'send':
     $isDraft = isset($_POST['is_draft']) ? intval($_POST['is_draft']) : 0;
     $forwardAttachments = isset($_POST['forward_attachments']) ? trim($_POST['forward_attachments']) : '';
     $replyToId = isset($_POST['reply_to_id']) ? intval($_POST['reply_to_id']) : 0;
+    $scheduledAt = isset($_POST['scheduled_at']) ? trim($_POST['scheduled_at']) : '';
 
     if (!$subject) $subject = '(No Subject)';
     $toUsers = parse_recipients($conn, $to);
@@ -48,9 +49,10 @@ case 'send':
     $hasAttachments = (!empty($_FILES['attachments']) && $_FILES['attachments']['error'][0] !== UPLOAD_ERR_NO_FILE) ? 1 : 0;
     if ($forwardAttachments) $hasAttachments = 1;
 
-    $sql = "INSERT INTO mail_messages (sender_id, subject, body, is_draft, has_attachments, sender_deleted, reply_to_id, created_at, sent_at)
-            VALUES (?, ?, ?, ?, ?, 0, ?, GETDATE(), " . ($isDraft ? "NULL" : "GETDATE()") . ")";
-    $msgId = db_insert_get_id($conn, $sql, array($userId, $subject, $body, $isDraft, $hasAttachments, $replyToId > 0 ? $replyToId : null));
+    $isScheduled = (!$isDraft && $scheduledAt) ? true : false;
+    $sql = "INSERT INTO mail_messages (sender_id, subject, body, is_draft, has_attachments, sender_deleted, reply_to_id, scheduled_at, created_at, sent_at)
+            VALUES (?, ?, ?, ?, ?, 0, ?, ?, GETDATE(), " . ($isDraft ? "NULL" : "GETDATE()") . ")";
+    $msgId = db_insert_get_id($conn, $sql, array($userId, $subject, $body, $isDraft, $hasAttachments, $replyToId > 0 ? $replyToId : null, $isScheduled ? $scheduledAt : null));
     if (!$msgId) json_response(array('error' => 'Failed to create message'), 500);
 
     // Insert recipients
@@ -99,7 +101,17 @@ case 'send':
         }
     }
 
-    json_response(array('success' => true, 'id' => $msgId, 'is_draft' => $isDraft));
+    // Execute inbox rules for each recipient (auto-move, auto-tag, etc.)
+    if (!$isDraft) {
+        $sender = db_fetch_one($conn, "SELECT username, display_name FROM mail_users WHERE id = ?", array($userId));
+        $senderName = $sender ? $sender['display_name'] : '';
+        $senderUsername = $sender ? $sender['username'] : '';
+        foreach ($allRecipients as $r) {
+            execute_inbox_rules($conn, $r[0], $msgId, $senderUsername, $senderName, $subject, $body);
+        }
+    }
+
+    json_response(array('success' => true, 'id' => $msgId, 'is_draft' => $isDraft, 'scheduled' => $isScheduled ? 1 : 0));
     break;
 
 case 'delete':
@@ -313,6 +325,13 @@ case 'batch_permanent_delete':
     json_response(array('success' => true));
     break;
 
+case 'mark_unread':
+    $messageId = isset($_POST['message_id']) ? intval($_POST['message_id']) : 0;
+    if (!$messageId) json_response(array('error' => 'Missing message ID'), 400);
+    db_execute($conn, "UPDATE mail_recipients SET is_read = 0 WHERE message_id = ? AND recipient_id = ?", array($messageId, $userId));
+    json_response(array('success' => true));
+    break;
+
 default:
     json_response(array('error' => 'Invalid action'), 400);
 }
@@ -328,3 +347,95 @@ function parse_recipients($conn, $str) {
     }
     return array_unique($ids);
 }
+
+/**
+ * Execute inbox rules for a recipient on an incoming message.
+ * Checks all active rules for the user and applies actions if conditions match.
+ */
+function execute_inbox_rules($conn, $recipientId, $messageId, $senderUsername, $senderName, $subject, $body) {
+    if (!db_table_exists($conn, 'mail_rules')) return;
+    $rules = db_fetch_all($conn, "SELECT * FROM mail_rules WHERE user_id = ? AND is_active = 1 ORDER BY sort_order", array($recipientId));
+    if (empty($rules)) return;
+
+    foreach ($rules as $rule) {
+        $conditions = json_decode($rule['conditions'], true);
+        $actions = json_decode($rule['actions'], true);
+        if (!is_array($conditions) || !is_array($actions)) continue;
+
+        $matchType = $rule['match_type']; // 'all' or 'any'
+        $matched = ($matchType === 'all');
+
+        foreach ($conditions as $cond) {
+            $field = isset($cond['field']) ? $cond['field'] : '';
+            $op = isset($cond['operator']) ? $cond['operator'] : 'contains';
+            $value = isset($cond['value']) ? strtolower(trim($cond['value'])) : '';
+            $result = false;
+
+            // Get the field value to check
+            $fieldValue = '';
+            if ($field === 'sender') $fieldValue = strtolower($senderUsername . ' ' . $senderName);
+            elseif ($field === 'subject') $fieldValue = strtolower($subject);
+            elseif ($field === 'body') $fieldValue = strtolower(strip_tags($body));
+            elseif ($field === 'has_attachment') {
+                $fieldValue = ''; // handled specially
+                $msg = db_fetch_one($conn, "SELECT has_attachments FROM mail_messages WHERE id = ?", array($messageId));
+                $result = ($msg && $msg['has_attachments']) ? true : false;
+                if ($op === 'is_false') $result = !$result;
+            }
+
+            if ($field !== 'has_attachment') {
+                if ($op === 'contains') $result = (strpos($fieldValue, $value) !== false);
+                elseif ($op === 'not_contains') $result = (strpos($fieldValue, $value) === false);
+                elseif ($op === 'equals') $result = ($fieldValue === $value);
+                elseif ($op === 'starts_with') $result = (strpos($fieldValue, $value) === 0);
+                elseif ($op === 'ends_with') $result = (substr($fieldValue, -strlen($value)) === $value);
+            }
+
+            if ($matchType === 'all') {
+                if (!$result) { $matched = false; break; }
+            } else {
+                if ($result) { $matched = true; break; }
+            }
+        }
+
+        if (!$matched) continue;
+
+        // Execute actions
+        foreach ($actions as $act) {
+            $type = isset($act['type']) ? $act['type'] : '';
+            $actValue = isset($act['value']) ? $act['value'] : '';
+
+            if ($type === 'move_to_folder' && $actValue) {
+                $folder = db_fetch_one($conn, "SELECT id FROM mail_folders WHERE id = ? AND user_id = ?", array(intval($actValue), $recipientId));
+                if ($folder) {
+                    db_execute($conn, "UPDATE mail_recipients SET folder_id = ? WHERE message_id = ? AND recipient_id = ?",
+                        array($folder['id'], $messageId, $recipientId));
+                }
+            } elseif ($type === 'move_to_trash') {
+                db_execute($conn, "UPDATE mail_recipients SET is_deleted = 1 WHERE message_id = ? AND recipient_id = ?",
+                    array($messageId, $recipientId));
+            } elseif ($type === 'mark_read') {
+                db_execute($conn, "UPDATE mail_recipients SET is_read = 1 WHERE message_id = ? AND recipient_id = ?",
+                    array($messageId, $recipientId));
+            } elseif ($type === 'star') {
+                db_execute($conn, "UPDATE mail_recipients SET is_starred = 1 WHERE message_id = ? AND recipient_id = ?",
+                    array($messageId, $recipientId));
+            } elseif ($type === 'add_tag' && $actValue) {
+                if (db_table_exists($conn, 'mail_message_tags')) {
+                    $tag = db_fetch_one($conn, "SELECT id FROM mail_tags WHERE id = ? AND user_id = ?", array(intval($actValue), $recipientId));
+                    if ($tag) {
+                        $exists = db_fetch_one($conn, "SELECT id FROM mail_message_tags WHERE message_id = ? AND tag_id = ? AND user_id = ?",
+                            array($messageId, $tag['id'], $recipientId));
+                        if (!$exists) {
+                            db_execute($conn, "INSERT INTO mail_message_tags (message_id, tag_id, user_id) VALUES (?, ?, ?)",
+                                array($messageId, $tag['id'], $recipientId));
+                        }
+                    }
+                }
+            }
+        }
+        // Only apply first matching rule
+        break;
+    }
+}
+

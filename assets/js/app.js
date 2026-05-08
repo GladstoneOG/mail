@@ -205,6 +205,7 @@ window.closePreviewModal = function() {
                 '</div>';
             list.appendChild(div);
         }
+        if (typeof checkEmptyForm === 'function') checkEmptyForm();
     };
 
     window.removeComposeFile = function(index) {
@@ -298,6 +299,12 @@ function syncEditorContent() {
 function sendMessage(isDraft) {
     var form = document.getElementById('compose-form');
     if (!form) return;
+
+    if (typeof checkEmptyForm === 'function' && checkEmptyForm()) {
+        showToast('Please enter at least a recipient, subject, or message', 'error');
+        return;
+    }
+
     syncEditorContent();
 
     var btn = document.getElementById(isDraft ? 'draft-btn' : 'send-btn');
@@ -1268,6 +1275,34 @@ document.addEventListener('keydown', function(e) {
         var eventModal = document.getElementById('event-modal');
         if (eventModal && eventModal.style.display !== 'none' && eventModal.style.display !== '') {
             if (typeof closeEventModal === 'function') closeEventModal();
+            return;
+        }
+
+        // 4.5 Rule Editor Modal
+        var ruleEditorModal = document.getElementById('rule-editor-modal');
+        if (ruleEditorModal && ruleEditorModal.style.display !== 'none' && ruleEditorModal.style.display !== '') {
+            if (typeof closeRuleEditor === 'function') closeRuleEditor();
+            return;
+        }
+
+        // 4.6 Rules Manager Modal
+        var rulesManagerModal = document.getElementById('rules-manager-modal');
+        if (rulesManagerModal && rulesManagerModal.style.display !== 'none' && rulesManagerModal.style.display !== '') {
+            if (typeof closeRulesManager === 'function') closeRulesManager();
+            return;
+        }
+
+        // 4.7 Tag Manager Modal
+        var tagManagerModal = document.getElementById('tag-manager-modal');
+        if (tagManagerModal && tagManagerModal.style.display !== 'none' && tagManagerModal.style.display !== '') {
+            if (typeof closeTagManager === 'function') closeTagManager();
+            return;
+        }
+
+        // 4.8 Context Menu
+        var ctxMenu = document.getElementById('ctx-menu');
+        if (ctxMenu && ctxMenu.style.display !== 'none' && ctxMenu.style.display !== '') {
+            ctxMenu.style.display = 'none';
             return;
         }
         

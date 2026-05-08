@@ -60,8 +60,9 @@ window.addEventListener('DOMContentLoaded', function(){
                     updateSidebarMini();
                     // Auto-show event detail after first load
                     if(eventParam){
-                        setTimeout(function(){ showEventDetail(parseInt(eventParam,10)); }, 300);
+                        var deepLinkId = parseInt(eventParam,10);
                         eventParam = null; // Only show once
+                        if(deepLinkId) setTimeout(function(){ showEventDetail(deepLinkId); }, 300);
                     }
                 }).catch(function(){});
         };

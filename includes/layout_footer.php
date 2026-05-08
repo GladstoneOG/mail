@@ -3,6 +3,93 @@
         </main>
     </div><!-- /.app-container -->
 
+<!-- Global Context Menu -->
+<div class="ctx-menu" id="ctx-menu"></div>
+
+<!-- Tag Manager Modal -->
+<div class="modal-overlay" id="tag-manager-modal" style="display:none;z-index:9600" onclick="if(event.target===this)closeTagManager()">
+    <div class="modal" style="max-width:480px">
+        <div class="modal-header">
+            <h3>🏷️ Manage Tags</h3>
+            <button class="modal-close" onclick="closeTagManager()">&times;</button>
+        </div>
+        <div class="modal-body" style="padding:16px 20px">
+            <div class="tag-manager-list" id="tag-manager-list"></div>
+            <div class="tag-create-row">
+                <input type="text" id="tag-new-name" placeholder="New tag name..." maxlength="50" style="flex:1;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px">
+                <button class="btn btn-primary btn-sm" onclick="createTag()">Add</button>
+            </div>
+            <input type="hidden" id="tag-new-color" value="#6366f1">
+            <div class="tag-color-swatches" id="tag-color-swatches">
+                <span class="tag-swatch selected" data-color="#6366f1" style="background:#6366f1" onclick="pickTagColor(this)"></span>
+                <span class="tag-swatch" data-color="#ef4444" style="background:#ef4444" onclick="pickTagColor(this)"></span>
+                <span class="tag-swatch" data-color="#f59e0b" style="background:#f59e0b" onclick="pickTagColor(this)"></span>
+                <span class="tag-swatch" data-color="#10b981" style="background:#10b981" onclick="pickTagColor(this)"></span>
+                <span class="tag-swatch" data-color="#3b82f6" style="background:#3b82f6" onclick="pickTagColor(this)"></span>
+                <span class="tag-swatch" data-color="#ec4899" style="background:#ec4899" onclick="pickTagColor(this)"></span>
+                <span class="tag-swatch" data-color="#8b5cf6" style="background:#8b5cf6" onclick="pickTagColor(this)"></span>
+                <span class="tag-swatch" data-color="#14b8a6" style="background:#14b8a6" onclick="pickTagColor(this)"></span>
+                <span class="tag-swatch" data-color="#f97316" style="background:#f97316" onclick="pickTagColor(this)"></span>
+                <span class="tag-swatch" data-color="#64748b" style="background:#64748b" onclick="pickTagColor(this)"></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Rules Manager Modal -->
+<div class="modal-overlay" id="rules-manager-modal" style="display:none;z-index:9600" onclick="if(event.target===this)closeRulesManager()">
+    <div class="modal" style="max-width:640px;max-height:90vh">
+        <div class="modal-header">
+            <h3>⚙️ Inbox Rules</h3>
+            <button class="modal-close" onclick="closeRulesManager()">&times;</button>
+        </div>
+        <div class="modal-body" style="padding:16px 20px;overflow-y:auto">
+            <div class="rules-list" id="rules-list"></div>
+            <div style="margin-top:14px">
+                <button class="btn btn-primary btn-sm" onclick="openRuleEditor()">+ New Rule</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Rule Editor Modal -->
+<div class="modal-overlay" id="rule-editor-modal" style="display:none;z-index:9700">
+    <div class="modal" style="max-width:580px;max-height:90vh">
+        <div class="modal-header">
+            <h3 id="rule-editor-title">📝 New Rule</h3>
+            <button class="modal-close" onclick="closeRuleEditor()">&times;</button>
+        </div>
+        <div class="modal-body" style="padding:16px 20px;overflow-y:auto">
+            <input type="hidden" id="rule-edit-id" value="">
+            <div class="form-group">
+                <label>Rule Name</label>
+                <input type="text" id="rule-name" placeholder="e.g., Move newsletters to folder..." style="padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;width:100%">
+            </div>
+            <div class="form-group">
+                <label>Match</label>
+                <select id="rule-match-type">
+                    <option value="all">ALL conditions</option>
+                    <option value="any">ANY condition</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Conditions</label>
+                <div id="rule-conditions-list"></div>
+                <button class="rule-add-btn" onclick="addRuleCondition()">+ Add condition</button>
+            </div>
+            <div class="form-group">
+                <label>Actions</label>
+                <div id="rule-actions-list"></div>
+                <button class="rule-add-btn" onclick="addRuleAction()">+ Add action</button>
+            </div>
+        </div>
+        <div style="padding:12px 20px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-ghost btn-sm" onclick="closeRuleEditor()">Cancel</button>
+            <button class="btn btn-primary btn-sm" id="rule-save-btn" onclick="saveRule()">Create Rule</button>
+        </div>
+    </div>
+</div>
+
     <div class="toast-container" id="toast-container"></div>
 
 <!-- Move-to Modal -->
@@ -126,6 +213,70 @@
         };
     </script>
     <script src="assets/js/app.js"></script>
+    <script src="assets/js/features.js"></script>
+    <script>
+    // ===== Advanced Search =====
+    function toggleAdvancedSearch(){
+        var dd = document.getElementById('adv-search-dropdown');
+        if(dd) dd.classList.toggle('show');
+    }
+    function clearAdvSearch(){
+        var ids = ['adv-sender','adv-subject','adv-date-from','adv-date-to','adv-content'];
+        for(var i=0;i<ids.length;i++){var el=document.getElementById(ids[i]);if(el)el.value='';}
+        var cb=document.getElementById('adv-attachment');if(cb)cb.checked=false;
+        var tagCbs=document.querySelectorAll('.adv-tag-checkbox');
+        for(var j=0;j<tagCbs.length;j++) tagCbs[j].checked=false;
+    }
+    function submitAdvSearch(){
+        var page = document.querySelector('#global-search-form input[name="page"]');
+        var pageName = page ? page.value : 'inbox';
+        var fid = document.querySelector('#global-search-form input[name="fid"]');
+        var parts = ['page='+encodeURIComponent(pageName)];
+        if(fid && fid.value) parts.push('fid='+fid.value);
+        // Build combined search URL from advanced fields
+        var sender = (document.getElementById('adv-sender')||{}).value||'';
+        var subject = (document.getElementById('adv-subject')||{}).value||'';
+        var dateFrom = (document.getElementById('adv-date-from')||{}).value||'';
+        var dateTo = (document.getElementById('adv-date-to')||{}).value||'';
+        var hasAtt = (document.getElementById('adv-attachment')||{}).checked;
+        var content = (document.getElementById('adv-content')||{}).value||'';
+        var tagCbs = document.querySelectorAll('.adv-tag-checkbox:checked');
+        var tags = [];
+        for(var i=0;i<tagCbs.length;i++) tags.push(tagCbs[i].value);
+
+        // Priority: pick the first filled field
+        if(sender){parts.push('sf=sender');parts.push('q='+encodeURIComponent(sender));}
+        else if(subject){parts.push('sf=subject');parts.push('q='+encodeURIComponent(subject));}
+        else if(dateFrom){parts.push('sf=date_from');parts.push('q='+encodeURIComponent(dateFrom));}
+        else if(dateTo){parts.push('sf=date_to');parts.push('q='+encodeURIComponent(dateTo));}
+        else if(hasAtt){parts.push('sf=has_attachment');parts.push('q=1');}
+        else if(content){parts.push('sf=content');parts.push('q='+encodeURIComponent(content));}
+        else if(tags.length>0){parts.push('sf=tags');parts.push('q='+encodeURIComponent(tags.join(',')));}
+        else{showToast('Please fill at least one search field','error');return;}
+        window.location = 'index.php?' + parts.join('&');
+    }
+    // Close dropdown on outside click
+    document.addEventListener('click',function(e){
+        var dd=document.getElementById('adv-search-dropdown');
+        var toggle=document.querySelector('.adv-search-toggle');
+        if(dd && !dd.contains(e.target) && e.target!==toggle) dd.classList.remove('show');
+    });
+    // Item 3: Enter key in adv search fields triggers search
+    function advSearchEnter(e){
+        var dd=document.getElementById('adv-search-dropdown');
+        if(dd && dd.classList.contains('show') && e.key==='Enter'){
+            e.preventDefault();
+            submitAdvSearch();
+        }
+    }
+    // Item 2: Color swatch picker for tags
+    function pickTagColor(el){
+        var swatches=document.querySelectorAll('#tag-color-swatches .tag-swatch');
+        for(var i=0;i<swatches.length;i++) swatches[i].classList.remove('selected');
+        el.classList.add('selected');
+        document.getElementById('tag-new-color').value = el.getAttribute('data-color');
+    }
+    </script>
     <script>
     // Sidebar mini calendar with navigation + auto-refresh
     (function(){

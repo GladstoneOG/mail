@@ -162,5 +162,89 @@ if (!$check || $check['len'] === null) {
     if ($r2) sqlsrv_free_stmt($r2);
 } else { $msgs[] = 'reply_to_id already exists on mail_messages'; }
 
+// ── Tags table ──
+if (!db_table_exists($conn, 'mail_tags')) {
+    $sql = "CREATE TABLE mail_tags (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        user_id INT NOT NULL,
+        name NVARCHAR(50) NOT NULL,
+        color NVARCHAR(20) NOT NULL DEFAULT '#6366f1',
+        created_at DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_tag_user FOREIGN KEY (user_id) REFERENCES mail_users(id),
+        CONSTRAINT UQ_tag_user_name UNIQUE(user_id, name)
+    )";
+    $r = sqlsrv_query($conn, $sql);
+    $msgs[] = $r ? 'Created table: mail_tags' : 'FAILED mail_tags: ' . print_r(sqlsrv_errors(), true);
+    if ($r) sqlsrv_free_stmt($r);
+    $r2 = sqlsrv_query($conn, "CREATE INDEX IX_tag_user ON mail_tags(user_id)");
+    if ($r2) sqlsrv_free_stmt($r2);
+} else { $msgs[] = 'mail_tags already exists'; }
+
+// ── Message-Tag join table ──
+if (!db_table_exists($conn, 'mail_message_tags')) {
+    $sql = "CREATE TABLE mail_message_tags (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        message_id INT NOT NULL,
+        tag_id INT NOT NULL,
+        user_id INT NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_msgtag_msg FOREIGN KEY (message_id) REFERENCES mail_messages(id),
+        CONSTRAINT FK_msgtag_tag FOREIGN KEY (tag_id) REFERENCES mail_tags(id) ON DELETE CASCADE,
+        CONSTRAINT FK_msgtag_user FOREIGN KEY (user_id) REFERENCES mail_users(id),
+        CONSTRAINT UQ_msgtag UNIQUE(message_id, tag_id, user_id)
+    )";
+    $r = sqlsrv_query($conn, $sql);
+    $msgs[] = $r ? 'Created table: mail_message_tags' : 'FAILED mail_message_tags: ' . print_r(sqlsrv_errors(), true);
+    if ($r) sqlsrv_free_stmt($r);
+    $idxs = array(
+        "CREATE INDEX IX_msgtag_msg ON mail_message_tags(message_id)",
+        "CREATE INDEX IX_msgtag_tag ON mail_message_tags(tag_id)",
+        "CREATE INDEX IX_msgtag_user ON mail_message_tags(user_id)"
+    );
+    foreach ($idxs as $ix) { $r = sqlsrv_query($conn, $ix); if ($r) sqlsrv_free_stmt($r); }
+    $msgs[] = 'Created indexes for mail_message_tags';
+} else { $msgs[] = 'mail_message_tags already exists'; }
+
+// ── Inbox Rules table ──
+if (!db_table_exists($conn, 'mail_rules')) {
+    $sql = "CREATE TABLE mail_rules (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        user_id INT NOT NULL,
+        name NVARCHAR(200) NOT NULL,
+        is_active BIT NOT NULL DEFAULT 1,
+        match_type NVARCHAR(10) NOT NULL DEFAULT 'all',
+        conditions NVARCHAR(MAX) NOT NULL,
+        actions NVARCHAR(MAX) NOT NULL,
+        sort_order INT NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT GETDATE(),
+        updated_at DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_rule_user FOREIGN KEY (user_id) REFERENCES mail_users(id)
+    )";
+    $r = sqlsrv_query($conn, $sql);
+    $msgs[] = $r ? 'Created table: mail_rules' : 'FAILED mail_rules: ' . print_r(sqlsrv_errors(), true);
+    if ($r) sqlsrv_free_stmt($r);
+    $r2 = sqlsrv_query($conn, "CREATE INDEX IX_rule_user ON mail_rules(user_id)");
+    if ($r2) sqlsrv_free_stmt($r2);
+} else { $msgs[] = 'mail_rules already exists'; }
+
+// ── scheduled_at column on mail_messages ──
+$check = db_fetch_one($conn, "SELECT COL_LENGTH('mail_messages','scheduled_at') AS len");
+if (!$check || $check['len'] === null) {
+    $r = sqlsrv_query($conn, "ALTER TABLE mail_messages ADD scheduled_at DATETIME NULL");
+    $msgs[] = $r ? 'Added scheduled_at column to mail_messages' : 'FAILED scheduled_at';
+    if ($r) sqlsrv_free_stmt($r);
+    $r2 = sqlsrv_query($conn, "CREATE INDEX IX_msg_scheduled ON mail_messages(scheduled_at)");
+    if ($r2) sqlsrv_free_stmt($r2);
+} else { $msgs[] = 'scheduled_at already exists on mail_messages'; }
+
+// ── email_footer column on mail_users ──
+$check = db_fetch_one($conn, "SELECT COL_LENGTH('mail_users','email_footer') AS len");
+if (!$check || $check['len'] === null) {
+    $r = sqlsrv_query($conn, "ALTER TABLE mail_users ADD email_footer NVARCHAR(MAX) NULL");
+    $msgs[] = $r ? 'Added email_footer column to mail_users' : 'FAILED email_footer: ' . print_r(sqlsrv_errors(), true);
+    if ($r) sqlsrv_free_stmt($r);
+} else { $msgs[] = 'email_footer already exists on mail_users'; }
+
 echo '<pre>Migration results: ' . implode("\n", $msgs) . '</pre>';
 echo '<a href="index.php">Go to app</a>';
+

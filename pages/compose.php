@@ -12,6 +12,12 @@ $prefillTo = ''; $prefillCc = ''; $prefillSubject = ''; $prefillBody = '';
 $forwardAttIds = array();
 $replyToId = 0;
 
+$user = db_fetch_one($conn, "SELECT email_footer FROM mail_users WHERE id = ?", array($userId));
+$footerHtml = '';
+if (false && $user && !empty($user['email_footer'])) {
+    $footerHtml = '<br><br><hr style="border:none;border-top:1px solid var(--border);margin:10px 0;"><div class="email-footer">' . $user['email_footer'] . '</div>';
+}
+
 if ($replyId || $replyAllId) {
     $origId = $replyId ? $replyId : $replyAllId;
     $orig = db_fetch_one($conn, "SELECT m.*, u.display_name AS sender_name, u.username AS sender_username
@@ -20,7 +26,7 @@ if ($replyId || $replyAllId) {
         $replyToId = $origId;
         $prefillTo = $orig['sender_username'];
         $prefillSubject = 'Re: ' . preg_replace('/^Re:\s*/i', '', $orig['subject']);
-        $prefillBody = '<br><br><div style="border-left:3px solid #555;padding-left:12px;color:#888;">--- Original Message from ' . e($orig['sender_name']) . ' ---<br>' . $orig['body'] . '</div>';
+        $prefillBody = $footerHtml . '<br><br><div style="border-left:3px solid #555;padding-left:12px;color:#888;">--- Original Message from ' . e($orig['sender_name']) . ' ---<br>' . $orig['body'] . '</div>';
         if ($replyAllId) {
             $others = db_fetch_all($conn, "SELECT u.username FROM mail_recipients mr JOIN mail_users u ON mr.recipient_id = u.id
                                             WHERE mr.message_id = ? AND mr.recipient_id != ? AND mr.recipient_type = 'to'", array($origId, $userId));
@@ -39,7 +45,7 @@ if ($forwardId) {
                                   JOIN mail_users u ON m.sender_id = u.id WHERE m.id = ?", array($forwardId));
     if ($orig) {
         $prefillSubject = 'Fwd: ' . preg_replace('/^Fwd:\s*/i', '', $orig['subject']);
-        $prefillBody = '<br><br><div style="border-left:3px solid #555;padding-left:12px;color:#888;">--- Forwarded from ' . e($orig['sender_name']) . ' ---<br>' . $orig['body'] . '</div>';
+        $prefillBody = $footerHtml . '<br><br><div style="border-left:3px solid #555;padding-left:12px;color:#888;">--- Forwarded from ' . e($orig['sender_name']) . ' ---<br>' . $orig['body'] . '</div>';
         $fwdAtts = db_fetch_all($conn, "SELECT id, original_name, file_size FROM mail_attachments WHERE message_id = ?", array($forwardId));
         foreach ($fwdAtts as $fa) $forwardAttIds[] = $fa;
     }
@@ -60,6 +66,10 @@ if ($draftId) {
         $prefillTo = implode(', ', $toL);
         $prefillCc = implode(', ', $ccL);
     }
+}
+
+if (!$replyId && !$replyAllId && !$forwardId && !$draftId) {
+    $prefillBody = $footerHtml;
 }
 
 if (isset($_GET['to'])) $prefillTo = $_GET['to'];
@@ -192,7 +202,33 @@ $allUsers = db_fetch_all($conn, "SELECT id, username, display_name FROM mail_use
         <div id="file-list" class="file-list"></div>
     </div>
     <div class="compose-actions">
-        <button type="submit" class="btn btn-primary" id="send-btn"><span>&#x1F4E8;</span> Send Message</button>
+        <div class="schedule-send-wrap">
+            <button type="submit" class="btn btn-primary" id="send-btn"><span>&#x1F4E8;</span> Send Message</button>
+            <button type="button" class="schedule-dropdown-toggle" onclick="toggleScheduleDropdown()" title="Schedule Send">&#x25B2;</button>
+            <div class="schedule-dropdown" id="schedule-dropdown">
+                <div class="schedule-header">&#x1F552; Schedule Send</div>
+                <div class="schedule-presets">
+                    <button type="button" class="schedule-preset" onclick="scheduleSendPreset('today_evening')">
+                        <span class="schedule-preset-icon">&#x1F307;</span> Later today <span style="margin-left:auto;color:var(--text3);font-size:11px" id="schedule-today-hint"></span>
+                    </button>
+                    <button type="button" class="schedule-preset" onclick="scheduleSendPreset('tomorrow_morning')">
+                        <span class="schedule-preset-icon">&#x2600;&#xFE0F;</span> Tomorrow morning <span style="margin-left:auto;color:var(--text3);font-size:11px">8:00 AM</span>
+                    </button>
+                    <button type="button" class="schedule-preset" onclick="scheduleSendPreset('next_monday')">
+                        <span class="schedule-preset-icon">&#x1F4C5;</span> Next Monday <span style="margin-left:auto;color:var(--text3);font-size:11px">8:00 AM</span>
+                    </button>
+                </div>
+                <div class="schedule-custom">
+                    <label>Custom date & time</label>
+                    <div class="schedule-custom-row">
+                        <input type="date" id="schedule-date">
+                        <input type="time" id="schedule-time" value="08:00">
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm" style="width:100%" onclick="scheduleSendCustom()">&#x1F4E8; Schedule Send</button>
+                </div>
+            </div>
+        </div>
+        <input type="hidden" name="scheduled_at" id="scheduled-at-input" value="">
         <button type="button" class="btn btn-secondary" id="draft-btn" onclick="saveDraft()"><span>&#x1F4DD;</span> Save Draft</button>
         <button type="button" class="btn btn-ghost" onclick="customConfirm('Discard message?', function() { window.hasUnsavedChanges = false; window.location='index.php?page=inbox'; })">Discard</button>
     </div>
@@ -306,10 +342,38 @@ function updateToolbarState() {
 // Track selection changes to update toolbar state
 var editor = document.getElementById('editor');
 if (editor) {
-    editor.addEventListener('keyup', updateToolbarState);
+    editor.addEventListener('keyup', function(e) { updateToolbarState(); checkEmptyForm(); });
     editor.addEventListener('mouseup', updateToolbarState);
     editor.addEventListener('focus', updateToolbarState);
 }
+
+// Item 4: Disable Send/Draft buttons if completely clean
+function checkEmptyForm() {
+    var to = document.getElementById('to').value.trim();
+    var cc = document.getElementById('cc').value.trim();
+    var bcc = document.getElementById('bcc').value.trim();
+    var subj = document.getElementById('subject').value.trim();
+    var body = editor ? editor.textContent.trim() : '';
+    var hasFiles = (window.composeFiles && window.composeFiles.length > 0);
+    var isEmpty = (!to && !cc && !bcc && !subj && !body && !hasFiles);
+
+    var sendBtn = document.getElementById('send-btn');
+    var draftBtn = document.getElementById('draft-btn');
+    var schedBtn = document.getElementById('schedule-send-toggle');
+    if (sendBtn) sendBtn.classList.toggle('btn-disabled', isEmpty);
+    if (draftBtn) draftBtn.classList.toggle('btn-disabled', isEmpty);
+    if (schedBtn) schedBtn.classList.toggle('btn-disabled', isEmpty);
+    return isEmpty;
+}
+
+// Attach listeners to fields for checkEmptyForm
+var fields = ['to', 'cc', 'bcc', 'subject'];
+for(var i=0;i<fields.length;i++){
+    var el = document.getElementById(fields[i]);
+    if(el) el.addEventListener('input', checkEmptyForm);
+}
+// Run once on load
+setTimeout(checkEmptyForm, 100);
 
 // Ensure "To" field gets focus when page loads
 var toField = document.getElementById('to');
@@ -320,4 +384,82 @@ if (toField) {
     toField.value = '';
     toField.value = val;
 }
+
+// ── Schedule Send ──
+function toggleScheduleDropdown() {
+    if (typeof checkEmptyForm === 'function' && checkEmptyForm()) {
+        showToast('Please enter at least a recipient, subject, or message', 'error');
+        return;
+    }
+    var dd = document.getElementById('schedule-dropdown');
+    var isOpen = dd.classList.contains('show');
+    dd.classList.toggle('show', !isOpen);
+    if (!isOpen) {
+        // Set today hint
+        var now = new Date();
+        var hint = document.getElementById('schedule-today-hint');
+        if (hint) {
+            var evening = new Date(now); evening.setHours(18, 0, 0, 0);
+            if (now.getHours() >= 18) evening.setDate(evening.getDate() + 1);
+            hint.textContent = evening.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+        }
+        // Set min date for custom picker
+        var dateInput = document.getElementById('schedule-date');
+        if (dateInput) {
+            var y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,'0'), d = String(now.getDate()).padStart(2,'0');
+            dateInput.min = y + '-' + m + '-' + d;
+            if (!dateInput.value) dateInput.value = y + '-' + m + '-' + d;
+        }
+    }
+}
+
+function scheduleSendPreset(preset) {
+    var now = new Date();
+    var target;
+    if (preset === 'today_evening') {
+        target = new Date(now); target.setHours(18, 0, 0, 0);
+        if (now.getHours() >= 18) target.setDate(target.getDate() + 1);
+    } else if (preset === 'tomorrow_morning') {
+        target = new Date(now); target.setDate(target.getDate() + 1); target.setHours(8, 0, 0, 0);
+    } else if (preset === 'next_monday') {
+        target = new Date(now);
+        var daysUntilMon = (8 - target.getDay()) % 7;
+        if (daysUntilMon === 0) daysUntilMon = 7;
+        target.setDate(target.getDate() + daysUntilMon);
+        target.setHours(8, 0, 0, 0);
+    }
+    if (target) doScheduleSend(target);
+}
+
+function scheduleSendCustom() {
+    var dateVal = document.getElementById('schedule-date').value;
+    var timeVal = document.getElementById('schedule-time').value;
+    if (!dateVal || !timeVal) { showToast('Please select date and time', 'error'); return; }
+    var target = new Date(dateVal + 'T' + timeVal);
+    if (target <= new Date()) { showToast('Scheduled time must be in the future', 'error'); return; }
+    doScheduleSend(target);
+}
+
+function doScheduleSend(target) {
+    var y = target.getFullYear();
+    var m = String(target.getMonth() + 1).padStart(2, '0');
+    var d = String(target.getDate()).padStart(2, '0');
+    var h = String(target.getHours()).padStart(2, '0');
+    var min = String(target.getMinutes()).padStart(2, '0');
+    var formatted = y + '-' + m + '-' + d + ' ' + h + ':' + min + ':00';
+    document.getElementById('scheduled-at-input').value = formatted;
+    document.getElementById('schedule-dropdown').classList.remove('show');
+    // Update send button text
+    var btn = document.getElementById('send-btn');
+    btn.innerHTML = '<span>&#x1F552;</span> Scheduled: ' + target.toLocaleDateString('en-US', {month:'short', day:'numeric'}) + ' ' + target.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+    showToast('Email will be sent ' + target.toLocaleDateString() + ' at ' + target.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'}), 'info');
+}
+
+// Close schedule dropdown on outside click
+document.addEventListener('click', function(e) {
+    var wrap = document.querySelector('.schedule-send-wrap');
+    var dd = document.getElementById('schedule-dropdown');
+    if (dd && wrap && !wrap.contains(e.target)) dd.classList.remove('show');
+});
 </script>
+

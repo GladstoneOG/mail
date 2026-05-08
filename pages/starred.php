@@ -15,7 +15,7 @@ $orderDir = strtoupper($dir);
 
 $sql = "SELECT m.id, m.subject, m.body, m.has_attachments, m.sent_at, m.created_at,
             MIN(CAST(mr.is_read AS INT)) AS is_read, MAX(CAST(mr.is_starred AS INT)) AS is_starred,
-            u.display_name AS sender_name
+            u.display_name AS sender_name, u.username AS sender_username
      FROM mail_recipients mr
      JOIN mail_messages m ON mr.message_id = m.id
      JOIN mail_users u ON m.sender_id = u.id
@@ -23,14 +23,41 @@ $sql = "SELECT m.id, m.subject, m.body, m.has_attachments, m.sent_at, m.created_
 $params = array($userId);
 
 if ($search) {
-    $sql .= " AND (m.subject LIKE ? OR m.body LIKE ? OR u.display_name LIKE ?)";
+    $searchField = isset($_GET['sf']) ? $_GET['sf'] : '';
     $searchLike = '%' . $search . '%';
-    $params[] = $searchLike;
-    $params[] = $searchLike;
-    $params[] = $searchLike;
+    if ($searchField === 'sender') {
+        $sql .= " AND (u.username LIKE ? OR u.display_name LIKE ?)";
+        $params[] = $searchLike; $params[] = $searchLike;
+    } elseif ($searchField === 'subject') {
+        $sql .= " AND m.subject LIKE ?";
+        $params[] = $searchLike;
+    } elseif ($searchField === 'content') {
+        $sql .= " AND m.body LIKE ?";
+        $params[] = $searchLike;
+    } elseif ($searchField === 'has_attachment') {
+        $sql .= " AND m.has_attachments = 1";
+    } elseif ($searchField === 'date_from') {
+        $sql .= " AND m.sent_at >= ?";
+        $params[] = $search;
+    } elseif ($searchField === 'date_to') {
+        $sql .= " AND m.sent_at <= ?";
+        $params[] = $search . ' 23:59:59';
+    } elseif ($searchField === 'tags') {
+        $tagIds = array_filter(array_map('intval', explode(',', $search)));
+        if (!empty($tagIds)) {
+            $placeholders = implode(',', array_fill(0, count($tagIds), '?'));
+            $sql .= " AND m.id IN (SELECT message_id FROM mail_message_tags WHERE tag_id IN ($placeholders) AND user_id = ?)";
+            $params = array_merge($params, $tagIds, array($userId));
+        }
+    } else {
+        $sql .= " AND (m.subject LIKE ? OR m.body LIKE ? OR u.display_name LIKE ?)";
+        $params[] = $searchLike;
+        $params[] = $searchLike;
+        $params[] = $searchLike;
+    }
 }
 
-$sql .= " GROUP BY m.id, m.subject, m.body, m.has_attachments, m.sent_at, m.created_at, u.display_name
+$sql .= " GROUP BY m.id, m.subject, m.body, m.has_attachments, m.sent_at, m.created_at, u.display_name, u.username
      ORDER BY $orderCol $orderDir";
 
 $messages = db_fetch_all($conn, $sql, $params);
@@ -81,6 +108,7 @@ function starred_sort_link($col, $label, $currentSort, $currentDir) {
                 <?php foreach ($messages as $msg): ?>
                     <tr class="msg-row <?php echo $msg['is_read'] ? '' : 'unread'; ?>"
                         data-msg-id="<?php echo $msg['id']; ?>"
+                        data-sender-username="<?php echo e($msg['sender_username']); ?>"
                         onclick="handleRowClick(event, <?php echo $msg['id']; ?>, 'starred')" style="cursor:pointer">
                         <td class="col-select-cell"><input type="checkbox" class="msg-select-cb" value="<?php echo $msg['id']; ?>" onclick="event.stopPropagation()"></td>
                         <td class="col-star-cell">

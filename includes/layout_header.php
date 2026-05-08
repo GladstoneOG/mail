@@ -116,6 +116,10 @@ $_foldersExpanded = isset($_COOKIE['folders_expanded']) ? $_COOKIE['folders_expa
                     <span class="nav-icon">&#x1F4C5;</span><span class="nav-label">Calendar</span>
                     <?php if ($_calTodayCount > 0): ?><span class="badge"><?php echo $_calTodayCount; ?></span><?php endif; ?>
                 </a>
+                <div class="nav-divider"></div>
+                <a href="javascript:void(0)" class="nav-item" onclick="openRulesManager()">
+                    <span class="nav-icon">&#x2699;&#xFE0F;</span><span class="nav-label">Inbox Rules</span>
+                </a>
                 <?php if (auth_is_admin()): ?>
                 <div class="nav-divider"></div>
                 <a href="index.php?page=admin" class="nav-item <?php echo $_activePage === 'admin' ? 'active' : ''; ?>">
@@ -263,14 +267,72 @@ $_isListPage = in_array($_activePage, $_listPages);
 <?php endif; ?>
 <?php endif; ?>
                 </div>
-                <form class="search-form action-search" method="GET" id="global-search-form">
-                    <input type="hidden" name="page" value="<?php echo e($_activePage); ?>">
-                    <?php if ($_activePage === 'folder' && isset($_GET['fid'])): ?>
-                        <input type="hidden" name="fid" value="<?php echo intval($_GET['fid']); ?>">
-                    <?php endif; ?>
-                    <input type="text" name="q" placeholder="Search messages..." value="<?php echo isset($_GET['q']) ? e($_GET['q']) : ''; ?>" class="search-input">
-                    <button type="submit" class="search-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></button>
-                </form>
+                <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
+                    <button class="btn btn-action btn-sm action-btn" onclick="openTagManager()" title="Manage Tags">
+                        <span style="font-size:13px">🏷️</span>
+                        <span class="action-label">Tags</span>
+                    </button>
+                    <form class="search-form action-search" method="GET" id="global-search-form" onkeydown="advSearchEnter(event)">
+                        <input type="hidden" name="page" value="<?php echo e($_activePage); ?>">
+                        <?php if ($_activePage === 'folder' && isset($_GET['fid'])): ?>
+                            <input type="hidden" name="fid" value="<?php echo intval($_GET['fid']); ?>">
+                        <?php endif; ?>
+                        <input type="hidden" name="sf" id="search-field-input" value="<?php echo isset($_GET['sf']) ? e($_GET['sf']) : ''; ?>">
+                        <input type="text" name="q" placeholder="Search messages..." value="<?php echo isset($_GET['q']) ? e($_GET['q']) : ''; ?>" class="search-input" id="search-q-input">
+                        <button type="button" class="adv-search-toggle" onclick="toggleAdvancedSearch()" title="Advanced Search">▾</button>
+                        <button type="submit" class="search-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></button>
+                        <div class="adv-search-dropdown" id="adv-search-dropdown">
+                            <div class="adv-search-header">🔍 Advanced Search</div>
+                            <div class="adv-search-field">
+                                <label>Sender</label>
+                                <input type="text" id="adv-sender" placeholder="Username or name...">
+                            </div>
+                            <div class="adv-search-field">
+                                <label>Subject</label>
+                                <input type="text" id="adv-subject" placeholder="Subject contains...">
+                            </div>
+                            <div class="adv-search-field">
+                                <label><?php echo $_activePage === 'sent' ? 'Sent' : 'Received'; ?> after</label>
+                                <input type="date" id="adv-date-from">
+                            </div>
+                            <div class="adv-search-field">
+                                <label><?php echo $_activePage === 'sent' ? 'Sent' : 'Received'; ?> before</label>
+                                <input type="date" id="adv-date-to">
+                            </div>
+                            <?php
+                            $headerTags = [];
+                            if (db_table_exists($conn, 'mail_tags')) {
+                                $headerTags = db_fetch_all($conn, "SELECT id, name, color FROM mail_tags WHERE user_id = ? ORDER BY name ASC", array($_SESSION['user']['id']));
+                            }
+                            if (!empty($headerTags)):
+                            ?>
+                            <div class="adv-search-field">
+                                <label>Tags</label>
+                                <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                                <?php foreach ($headerTags as $ht): ?>
+                                    <label class="tag-filter-label" style="display:inline-flex;align-items:center;font-size:11px;padding:2px 6px;border:1px solid var(--border);border-radius:4px;cursor:pointer;">
+                                        <input type="checkbox" class="adv-tag-checkbox" value="<?php echo $ht['id']; ?>" style="margin:0 4px 0 0">
+                                        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:<?php echo e($ht['color']); ?>;margin-right:4px;"></span>
+                                        <?php echo e($ht['name']); ?>
+                                    </label>
+                                <?php endforeach; ?>
+                                </div>
+                            </div>
+                            <?php endif; ?>
+                            <div class="adv-search-field">
+                                <label><input type="checkbox" id="adv-attachment"> Has attachment</label>
+                            </div>
+                            <div class="adv-search-field">
+                                <label>Content</label>
+                                <input type="text" id="adv-content" placeholder="Body contains...">
+                            </div>
+                            <div class="adv-search-actions">
+                                <button type="button" class="btn btn-ghost btn-sm" onclick="clearAdvSearch()">Clear</button>
+                                <button type="button" class="btn btn-primary btn-sm" onclick="submitAdvSearch()">Search</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
             </div>
 <?php endif; ?>
             <div class="content-area">

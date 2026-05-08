@@ -16,10 +16,36 @@ $countSql = "SELECT COUNT(*) FROM mail_messages WHERE sender_id = ? AND is_draft
 $countParams = array($userId);
 
 if ($search) {
-    $countSql .= " AND (subject LIKE ? OR body LIKE ?)";
+    $searchField = isset($_GET['sf']) ? $_GET['sf'] : '';
     $searchLike = '%' . $search . '%';
-    $countParams[] = $searchLike;
-    $countParams[] = $searchLike;
+    if ($searchField === 'sender') {
+        $countSql .= " AND m.id IN (SELECT message_id FROM mail_recipients WHERE recipient_type='to' AND recipient_id IN (SELECT id FROM mail_users WHERE username LIKE ? OR display_name LIKE ?))";
+        $countParams[] = $searchLike; $countParams[] = $searchLike;
+    } elseif ($searchField === 'subject') {
+        $countSql .= " AND m.subject LIKE ?";
+        $countParams[] = $searchLike;
+    } elseif ($searchField === 'content') {
+        $countSql .= " AND m.body LIKE ?";
+        $countParams[] = $searchLike;
+    } elseif ($searchField === 'has_attachment') {
+        $countSql .= " AND m.has_attachments = 1";
+    } elseif ($searchField === 'date_from') {
+        $countSql .= " AND m.sent_at >= ?";
+        $countParams[] = $search;
+    } elseif ($searchField === 'date_to') {
+        $countSql .= " AND m.sent_at <= ?";
+        $countParams[] = $search . ' 23:59:59';
+    } elseif ($searchField === 'tags') {
+        $tagIds = array_filter(array_map('intval', explode(',', $search)));
+        if (!empty($tagIds)) {
+            $placeholders = implode(',', array_fill(0, count($tagIds), '?'));
+            $countSql .= " AND m.id IN (SELECT message_id FROM mail_message_tags WHERE tag_id IN ($placeholders) AND user_id = ?)";
+            $countParams = array_merge($countParams, $tagIds, array($userId));
+        }
+    } else {
+        $countSql .= " AND (m.subject LIKE ? OR m.body LIKE ?)";
+        $countParams[] = $searchLike; $countParams[] = $searchLike;
+    }
 }
 
 $total = intval(db_fetch_scalar($conn, $countSql, $countParams));
@@ -40,10 +66,33 @@ $sql = "SELECT m.id, m.subject, m.body, m.has_attachments, m.sent_at, m.created_
 $params = array($userId);
 
 if ($search) {
-    $sql .= " AND (m.subject LIKE ? OR m.body LIKE ?)";
-    $searchLike = '%' . $search . '%';
-    $params[] = $searchLike;
-    $params[] = $searchLike;
+    if ($searchField === 'sender') {
+        $sql .= " AND m.id IN (SELECT message_id FROM mail_recipients WHERE recipient_type='to' AND recipient_id IN (SELECT id FROM mail_users WHERE username LIKE ? OR display_name LIKE ?))";
+        $params[] = $searchLike; $params[] = $searchLike;
+    } elseif ($searchField === 'subject') {
+        $sql .= " AND m.subject LIKE ?";
+        $params[] = $searchLike;
+    } elseif ($searchField === 'content') {
+        $sql .= " AND m.body LIKE ?";
+        $params[] = $searchLike;
+    } elseif ($searchField === 'has_attachment') {
+        $sql .= " AND m.has_attachments = 1";
+    } elseif ($searchField === 'date_from') {
+        $sql .= " AND m.sent_at >= ?";
+        $params[] = $search;
+    } elseif ($searchField === 'date_to') {
+        $sql .= " AND m.sent_at <= ?";
+        $params[] = $search . ' 23:59:59';
+    } elseif ($searchField === 'tags') {
+        if (!empty($tagIds)) {
+            $placeholders = implode(',', array_fill(0, count($tagIds), '?'));
+            $sql .= " AND m.id IN (SELECT message_id FROM mail_message_tags WHERE tag_id IN ($placeholders) AND user_id = ?)";
+            $params = array_merge($params, $tagIds, array($userId));
+        }
+    } else {
+        $sql .= " AND (m.subject LIKE ? OR m.body LIKE ?)";
+        $params[] = $searchLike; $params[] = $searchLike;
+    }
 }
 
 $sql .= " ORDER BY $orderCol $orderDir OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
