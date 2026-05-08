@@ -5,6 +5,83 @@
 
     <div class="toast-container" id="toast-container"></div>
 
+<!-- Move-to Modal -->
+<div class="modal-overlay" id="move-to-modal" style="display:none;z-index:9800" data-current-page="<?php echo e($_activePage); ?>" data-current-folder="<?php echo $_activeFolderId; ?>" onclick="if(event.target===this)closeMoveToModal()">
+    <div class="modal" style="max-width:420px">
+        <div class="modal-header">
+            <h3>&#x1F4C2; Move to...</h3>
+            <button class="modal-close" onclick="closeMoveToModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="padding:12px 20px">
+            <div class="moveto-options" id="moveto-options">
+                <button class="moveto-option" id="moveto-inbox-opt" data-target="inbox" onclick="selectMoveTarget(this, '')">
+                    <span class="moveto-icon">&#x1F4E5;</span>
+                    <span>Inbox</span>
+                </button>
+                <div class="moveto-divider"></div>
+                <div class="moveto-folders-label">Folders</div>
+                <div id="moveto-folder-list"></div>
+                <div class="moveto-divider"></div>
+                <button class="moveto-option moveto-trash" id="moveto-trash-opt" data-target="trash" onclick="selectMoveTarget(this, 'trash')">
+                    <span class="moveto-icon">&#x1F6AE;</span>
+                    <span>Trash</span>
+                </button>
+            </div>
+        </div>
+        <div style="padding:12px 20px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-ghost btn-sm" onclick="closeMoveToModal()">Cancel</button>
+            <button class="btn btn-primary btn-sm" id="moveto-confirm-btn" onclick="confirmMoveTo()" disabled>Move</button>
+        </div>
+    </div>
+</div>
+
+<!-- Folder Input Prompt Modal (replaces browser prompt) -->
+<div class="modal-overlay" id="folder-input-modal" style="display:none;z-index:9900" onclick="if(event.target===this)closeFolderInputModal()">
+    <div class="modal" style="max-width:400px">
+        <div class="modal-header">
+            <h3 id="folder-input-title">&#x1F4C1; New Folder</h3>
+            <button class="modal-close" onclick="closeFolderInputModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="padding:16px 20px">
+            <div class="form-group">
+                <label id="folder-input-label" style="display:block;font-size:13px;color:var(--text2);margin-bottom:6px">Folder name</label>
+                <input type="text" id="folder-input-field" placeholder="Enter folder name..." maxlength="100" style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px">
+            </div>
+        </div>
+        <div style="padding:12px 20px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-ghost btn-sm" onclick="closeFolderInputModal()">Cancel</button>
+            <button class="btn btn-primary btn-sm" id="folder-input-ok" onclick="submitFolderInput()">Create</button>
+        </div>
+    </div>
+</div>
+
+<!-- Folder Delete Confirmation Modal (type-to-confirm) -->
+<div class="modal-overlay" id="folder-delete-modal" style="display:none;z-index:9900">
+    <div class="modal" style="max-width:440px">
+        <div class="modal-header">
+            <h3>&#x1F5D1; Delete Folder</h3>
+            <button class="modal-close" onclick="closeFolderDeleteModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="padding:16px 20px">
+            <div style="padding:10px 14px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:var(--radius-sm);margin-bottom:14px;font-size:13px;color:var(--danger)">
+                <strong>⚠ Warning:</strong> This will permanently delete the folder. Messages inside will be moved back to Inbox.
+            </div>
+            <p style="color:var(--text2);font-size:13px;margin-bottom:10px">To confirm, type the folder name <strong id="folder-delete-name-display" style="color:var(--text)"></strong> below:</p>
+            <input type="text" id="folder-delete-confirm-input" placeholder="Type folder name to confirm..." style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px" oninput="checkFolderDeleteConfirm()">
+        </div>
+        <div style="padding:12px 20px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-ghost btn-sm" onclick="closeFolderDeleteModal()">Cancel</button>
+            <button class="btn btn-danger btn-sm" id="folder-delete-confirm-btn" onclick="executeDeleteFolder()" disabled>Delete Folder</button>
+        </div>
+    </div>
+</div>
+
+<!-- Folder Context Menu -->
+<div class="folder-ctx-menu" id="folder-ctx-menu" style="display:none">
+    <button onclick="renameFolderAction()">&#x270F;&#xFE0F; Rename</button>
+    <button onclick="deleteFolderAction()" class="ctx-danger">&#x1F5D1; Delete</button>
+</div>
+
 <?php if (!empty($_calTodayEvents)): ?>
     <div class="modal-overlay" id="cal-reminder-modal" style="display:flex;z-index:9500">
         <div class="modal cal-reminder-modal" style="max-width:460px;text-align:center">
@@ -146,4 +223,3 @@
     </script>
 </body>
 </html>
-

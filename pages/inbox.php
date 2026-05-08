@@ -15,7 +15,7 @@ if (!in_array($dir, array('asc', 'desc'))) $dir = 'desc';
 
 $countSql = "SELECT COUNT(DISTINCT m.id) FROM mail_recipients mr
              JOIN mail_messages m ON mr.message_id = m.id
-             WHERE mr.recipient_id = ? AND mr.is_deleted = 0 AND m.is_draft = 0";
+             WHERE mr.recipient_id = ? AND mr.is_deleted = 0 AND m.is_draft = 0 AND (mr.folder_id IS NULL)";
 $countParams = array($userId);
 
 $sql = "SELECT m.id, m.subject, m.body, m.has_attachments, m.created_at, m.sent_at,
@@ -24,7 +24,7 @@ $sql = "SELECT m.id, m.subject, m.body, m.has_attachments, m.created_at, m.sent_
         FROM mail_recipients mr
         JOIN mail_messages m ON mr.message_id = m.id
         JOIN mail_users u ON m.sender_id = u.id
-        WHERE mr.recipient_id = ? AND mr.is_deleted = 0 AND m.is_draft = 0";
+        WHERE mr.recipient_id = ? AND mr.is_deleted = 0 AND m.is_draft = 0 AND (mr.folder_id IS NULL)";
 $params = array($userId);
 
 if ($search) {
@@ -56,6 +56,19 @@ $params[] = $offset;
 $params[] = ITEMS_PER_PAGE;
 
 $messages = db_fetch_all($conn, $sql, $params);
+
+// Check for replies by current user
+$replyMap = array();
+if (!empty($messages)) {
+    $msgIds = array_map(function($m){ return $m['id']; }, $messages);
+    $inClause = implode(',', $msgIds);
+    $replies = db_fetch_all($conn,
+        "SELECT reply_to_id, id AS reply_id, sent_at FROM mail_messages WHERE sender_id = ? AND reply_to_id IN ($inClause) AND is_draft = 0",
+        array($userId));
+    foreach ($replies as $r) {
+        $replyMap[intval($r['reply_to_id'])] = $r;
+    }
+}
 
 // Helper for sort link
 function inbox_sort_link($col, $label, $currentSort, $currentDir, $search) {
@@ -111,6 +124,9 @@ function inbox_sort_link($col, $label, $currentSort, $currentDir, $search) {
                             </div>
                         </td>
                         <td class="col-subject-cell">
+                            <?php if (isset($replyMap[$msg['id']])): ?>
+                                <span class="replied-indicator" title="You replied to this message">&#x21A9;</span>
+                            <?php endif; ?>
                             <span class="msg-subj-text"><?php echo e($msg['subject']); ?></span>
                             <span class="msg-preview-inline"> &mdash; <?php echo e(truncate_text($msg['body'], 60)); ?></span>
                         </td>

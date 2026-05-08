@@ -10,12 +10,14 @@ $draftId = isset($_GET['draft']) ? intval($_GET['draft']) : 0;
 
 $prefillTo = ''; $prefillCc = ''; $prefillSubject = ''; $prefillBody = '';
 $forwardAttIds = array();
+$replyToId = 0;
 
 if ($replyId || $replyAllId) {
     $origId = $replyId ? $replyId : $replyAllId;
     $orig = db_fetch_one($conn, "SELECT m.*, u.display_name AS sender_name, u.username AS sender_username
                                   FROM mail_messages m JOIN mail_users u ON m.sender_id = u.id WHERE m.id = ?", array($origId));
     if ($orig) {
+        $replyToId = $origId;
         $prefillTo = $orig['sender_username'];
         $prefillSubject = 'Re: ' . preg_replace('/^Re:\s*/i', '', $orig['subject']);
         $prefillBody = '<br><br><div style="border-left:3px solid #555;padding-left:12px;color:#888;">--- Original Message from ' . e($orig['sender_name']) . ' ---<br>' . $orig['body'] . '</div>';
@@ -113,13 +115,14 @@ $allUsers = db_fetch_all($conn, "SELECT id, username, display_name FROM mail_use
 <form id="compose-form" class="compose-form" enctype="multipart/form-data">
     <input type="hidden" name="csrf_token" value="<?php echo e($csrfToken); ?>">
     <input type="hidden" name="draft_id" value="<?php echo $draftId; ?>">
+    <input type="hidden" name="reply_to_id" value="<?php echo $replyToId; ?>">
     <input type="hidden" name="forward_attachments" id="forward_attachments" value="<?php echo implode(',', array_map(function($a){ return $a['id']; }, $forwardAttIds)); ?>">
 
     <div class="form-group">
         <label for="to">To</label>
         <div class="to-input-row">
             <button type="button" class="ab-open-btn" onclick="openAddressBook()" title="Open Address Book">&#x1F4D6;</button>
-            <input type="text" id="to" name="to" placeholder="Type usernames separated by commas..." value="<?php echo e($prefillTo); ?>" class="recipient-input" autocomplete="off">
+            <input type="text" id="to" name="to" placeholder="Type usernames separated by commas..." value="<?php echo e($prefillTo); ?>" class="recipient-input" autocomplete="off" autofocus>
         </div>
         <div class="autocomplete-dropdown" id="to-dropdown"></div>
     </div>
@@ -306,5 +309,15 @@ if (editor) {
     editor.addEventListener('keyup', updateToolbarState);
     editor.addEventListener('mouseup', updateToolbarState);
     editor.addEventListener('focus', updateToolbarState);
+}
+
+// Ensure "To" field gets focus when page loads
+var toField = document.getElementById('to');
+if (toField) {
+    toField.focus();
+    // Move cursor to end if there's prefilled text
+    var val = toField.value;
+    toField.value = '';
+    toField.value = val;
 }
 </script>

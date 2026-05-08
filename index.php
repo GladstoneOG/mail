@@ -21,7 +21,7 @@ $publicPages = array('login');
 if (defined('ALLOW_SELF_REGISTRATION') && ALLOW_SELF_REGISTRATION) {
     $publicPages[] = 'register';
 }
-$validPages = array('login','register','inbox','compose','view','sent','drafts','trash','starred','contacts','profile','admin','outbox','calendar');
+$validPages = array('login','register','inbox','compose','view','sent','drafts','trash','starred','contacts','profile','admin','outbox','calendar','folder');
 
 if (!in_array($page, $validPages)) {
     $page = 'inbox';
@@ -66,6 +66,11 @@ if (in_array($page, $publicPages)) {
 $currentUser = auth_user();
 $unreadCount = get_unread_count($conn, auth_user_id());
 $csrfToken = get_csrf_token();
+
+// Pre-load folder info if on folder page (needed by layout_header for toolbar)
+if ($page === 'folder' && isset($_GET['fid'])) {
+    $folder = db_fetch_one($conn, "SELECT * FROM mail_folders WHERE id = ? AND user_id = ?", array(intval($_GET['fid']), auth_user_id()));
+}
 
 include __DIR__ . '/includes/layout_header.php';
 include $pageFile;

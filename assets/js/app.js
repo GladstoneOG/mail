@@ -3,6 +3,13 @@
  * ES5 compatible for older browsers
  */
 
+// HTML-escape utility
+function escHtml(s) {
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(s));
+    return d.innerHTML;
+}
+
 // ============ CUSTOM DIALOG ============
 (function () {
     var dialogHtml = '<div class="modal-overlay" id="custom-dialog-modal" style="display:none;z-index:10000">' +
@@ -831,7 +838,7 @@ function toggleSelectAll(masterCb) {
     }
 }
 
-// Confirm trash/delete action
+// Confirm trash/delete action (only used on trash page now)
 function confirmTrashAction() {
     var ids = getSelectedIds();
     if (ids.length === 0) {
@@ -840,21 +847,23 @@ function confirmTrashAction() {
     }
     var page = document.querySelector('.main-content') ? document.querySelector('.main-content').getAttribute('data-page') : 'inbox';
     var isTrashPage = (page === 'trash');
-    var action = isTrashPage ? 'batch_permanent_delete' : 'batch_delete';
-    var confirmMsg = isTrashPage
-        ? 'Permanently delete ' + ids.length + ' selected message(s)?'
-        : 'Move ' + ids.length + ' selected message(s) to trash?';
+    if (!isTrashPage) {
+        // Non-trash pages use the Move-to modal now
+        openMoveToModal();
+        return;
+    }
+    var confirmMsg = 'Permanently delete ' + ids.length + ' selected message(s)?';
 
     customConfirm(confirmMsg, function() {
-        fetch('api/messages.php?action=' + action, {
+        fetch('api/messages.php?action=batch_permanent_delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'action=' + action + '&ids=' + ids.join(',')
+            body: 'action=batch_permanent_delete&ids=' + ids.join(',')
         })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (data.success) {
-                showToast(isTrashPage ? 'Messages permanently deleted' : 'Messages moved to trash', 'success');
+                showToast('Messages permanently deleted', 'success');
                 setTimeout(function() { window.location.reload(); }, 600);
             } else {
                 showToast(data.error || 'Operation failed', 'error');
@@ -863,6 +872,320 @@ function confirmTrashAction() {
         .catch(function() {
             showToast('Network error. Please try again.', 'error');
         });
+    });
+}
+
+// ============ MOVE-TO MODAL ============
+var _moveToTarget = null;
+
+function openMoveToModal() {
+    var ids = getSelectedIds();
+    if (ids.length === 0) {
+        showToast('No messages selected', 'error');
+        return;
+    }
+    _moveToTarget = null;
+
+    // Determine current location to hide it from options
+    var modal = document.getElementById('move-to-modal');
+    var currentPage = modal ? modal.getAttribute('data-current-page') : '';
+    var currentFolder = modal ? modal.getAttribute('data-current-folder') : '0';
+
+    // Show/hide Inbox option
+    var inboxOpt = document.getElementById('moveto-inbox-opt');
+    if (inboxOpt) inboxOpt.style.display = (currentPage === 'inbox') ? 'none' : '';
+
+    // Show/hide Trash option
+    var trashOpt = document.getElementById('moveto-trash-opt');
+    if (trashOpt) trashOpt.style.display = (currentPage === 'trash') ? 'none' : '';
+
+    // Load folders (hide the current folder if on a folder page)
+    fetch('api/messages.php?action=get_folders')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var list = document.getElementById('moveto-folder-list');
+            if (!list) return;
+            list.innerHTML = '';
+            if (data.folders && data.folders.length > 0) {
+                for (var i = 0; i < data.folders.length; i++) {
+                    var f = data.folders[i];
+                    // Hide current folder
+                    if (currentPage === 'folder' && String(f.id) === String(currentFolder)) continue;
+                    var btn = document.createElement('button');
+                    btn.className = 'moveto-option';
+                    btn.setAttribute('data-target', f.id);
+                    btn.innerHTML = '<span class="nav-folder-dot" style="background:' + escHtml(f.color) + '"></span><span>' + escHtml(f.name) + '</span>';
+                    btn.onclick = (function(fid) {
+                        return function() { selectMoveTarget(this, fid); };
+                    })(f.id);
+                    list.appendChild(btn);
+                }
+            } else {
+                list.innerHTML = '<div style="padding:8px 12px;color:var(--text3);font-size:12px">No folders yet</div>';
+            }
+        });
+    // Reset selection
+    var opts = document.querySelectorAll('.moveto-option');
+    for (var i = 0; i < opts.length; i++) opts[i].classList.remove('selected');
+    var confirmBtn = document.getElementById('moveto-confirm-btn');
+    if (confirmBtn) confirmBtn.disabled = true;
+    document.getElementById('move-to-modal').style.display = 'flex';
+}
+
+window.selectMoveTarget = function(btn, target) {
+    _moveToTarget = target;
+    var opts = document.querySelectorAll('.moveto-option');
+    for (var i = 0; i < opts.length; i++) opts[i].classList.remove('selected');
+    btn.classList.add('selected');
+    var confirmBtn = document.getElementById('moveto-confirm-btn');
+    if (confirmBtn) confirmBtn.disabled = false;
+};
+
+function closeMoveToModal() {
+    document.getElementById('move-to-modal').style.display = 'none';
+    _moveToTarget = null;
+}
+
+function confirmMoveTo() {
+    if (_moveToTarget === null) { showToast('Please select a destination', 'error'); return; }
+    var ids = getSelectedIds();
+    if (ids.length === 0) { showToast('No messages selected', 'error'); return; }
+
+    var body = 'action=batch_move_to_folder&ids=' + ids.join(',') + '&folder_id=' + encodeURIComponent(_moveToTarget);
+    fetch('api/messages.php?action=batch_move_to_folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            var dest = _moveToTarget === 'trash' ? 'Trash' : (_moveToTarget === '' ? 'Inbox' : 'folder');
+            showToast('Moved ' + ids.length + ' message(s) to ' + dest, 'success');
+            closeMoveToModal();
+            cancelTrashMode();
+            setTimeout(function() { window.location.reload(); }, 600);
+        } else {
+            showToast(data.error || 'Move failed', 'error');
+        }
+    })
+    .catch(function() { showToast('Network error', 'error'); });
+}
+
+// ============ FOLDER MANAGEMENT ============
+
+function toggleFoldersSection() {
+    var list = document.getElementById('folders-list');
+    var chevron = document.getElementById('folders-chevron');
+    if (!list) return;
+    var isOpen = list.style.display !== 'none';
+    list.style.display = isOpen ? 'none' : 'block';
+    if (chevron) chevron.innerHTML = isOpen ? '&#x25B6;' : '&#x25BC;';
+    document.cookie = 'folders_expanded=' + (isOpen ? '0' : '1') + ';path=/;max-age=31536000';
+}
+
+// ---- Custom input modal for create/rename ----
+var _folderInputCallback = null;
+
+function openFolderInputModal(title, label, btnText, defaultValue, callback) {
+    _folderInputCallback = callback;
+    document.getElementById('folder-input-title').innerHTML = title;
+    document.getElementById('folder-input-label').textContent = label;
+    document.getElementById('folder-input-ok').textContent = btnText;
+    var field = document.getElementById('folder-input-field');
+    field.value = defaultValue || '';
+    document.getElementById('folder-input-modal').style.display = 'flex';
+    setTimeout(function() { field.focus(); field.select(); }, 50);
+}
+
+function closeFolderInputModal() {
+    document.getElementById('folder-input-modal').style.display = 'none';
+    _folderInputCallback = null;
+}
+
+function submitFolderInput() {
+    var field = document.getElementById('folder-input-field');
+    var val = field.value.trim();
+    if (!val) { field.style.borderColor = 'var(--danger)'; return; }
+    field.style.borderColor = '';
+    var cb = _folderInputCallback;
+    closeFolderInputModal();
+    if (cb) cb(val);
+}
+
+// Allow Enter key in folder input modal
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        var modal = document.getElementById('folder-input-modal');
+        if (modal && modal.style.display === 'flex') {
+            e.preventDefault();
+            submitFolderInput();
+        }
+        var delModal = document.getElementById('folder-delete-modal');
+        if (delModal && delModal.style.display === 'flex') {
+            var btn = document.getElementById('folder-delete-confirm-btn');
+            if (btn && !btn.disabled) { e.preventDefault(); executeDeleteFolder(); }
+        }
+    }
+});
+
+// ---- Toolbar rename/delete (for folder page action bar) ----
+function toolbarRenameFolder() {
+    if (typeof _toolbarFolderId === 'undefined') return;
+    _ctxFolderId = _toolbarFolderId;
+    _ctxFolderName = _toolbarFolderName;
+    renameFolderAction();
+}
+
+function toolbarDeleteFolder() {
+    if (typeof _toolbarFolderId === 'undefined') return;
+    _ctxFolderId = _toolbarFolderId;
+    _ctxFolderName = _toolbarFolderName;
+    deleteFolderAction();
+}
+
+function promptCreateFolder() {
+    openFolderInputModal('&#x1F4C1; New Folder', 'Folder name', 'Create', '', function(name) {
+        var colors = ['#6366f1','#8b5cf6','#ec4899','#f97316','#22c55e','#06b6d4','#3b82f6','#64748b'];
+        var color = colors[Math.floor(Math.random() * colors.length)];
+
+        fetch('api/messages.php?action=create_folder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'action=create_folder&name=' + encodeURIComponent(name) + '&color=' + encodeURIComponent(color)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                showToast('Folder created!', 'success');
+                setTimeout(function() { window.location.reload(); }, 500);
+            } else {
+                showToast(data.error || 'Failed to create folder', 'error');
+            }
+        })
+        .catch(function() { showToast('Network error', 'error'); });
+    });
+}
+
+// Folder context menu
+var _ctxFolderId = 0;
+var _ctxFolderName = '';
+
+function showFolderContextMenu(event, folderId, folderName) {
+    _ctxFolderId = folderId;
+    _ctxFolderName = folderName;
+    var menu = document.getElementById('folder-ctx-menu');
+    if (!menu) return;
+    menu.style.display = 'block';
+    menu.style.left = event.clientX + 'px';
+    menu.style.top = event.clientY + 'px';
+    // Close on outside click
+    setTimeout(function() {
+        document.addEventListener('click', closeFolderCtx);
+    }, 10);
+}
+
+function closeFolderCtx() {
+    var menu = document.getElementById('folder-ctx-menu');
+    if (menu) menu.style.display = 'none';
+    document.removeEventListener('click', closeFolderCtx);
+}
+
+function renameFolderAction() {
+    closeFolderCtx();
+    openFolderInputModal('&#x270F;&#xFE0F; Rename Folder', 'New name', 'Rename', _ctxFolderName, function(name) {
+        fetch('api/messages.php?action=rename_folder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'action=rename_folder&folder_id=' + _ctxFolderId + '&name=' + encodeURIComponent(name)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                showToast('Folder renamed', 'success');
+                setTimeout(function() { window.location.reload(); }, 500);
+            } else {
+                showToast(data.error || 'Failed to rename', 'error');
+            }
+        });
+    });
+}
+
+// ---- Folder delete with type-to-confirm safety ----
+var _deleteFolderId = 0;
+var _deleteFolderName = '';
+
+function deleteFolderAction() {
+    closeFolderCtx();
+    _deleteFolderId = _ctxFolderId;
+    _deleteFolderName = _ctxFolderName;
+    document.getElementById('folder-delete-name-display').textContent = _deleteFolderName;
+    document.getElementById('folder-delete-confirm-input').value = '';
+    document.getElementById('folder-delete-confirm-btn').disabled = true;
+    document.getElementById('folder-delete-modal').style.display = 'flex';
+    setTimeout(function() { document.getElementById('folder-delete-confirm-input').focus(); }, 50);
+}
+
+function closeFolderDeleteModal() {
+    document.getElementById('folder-delete-modal').style.display = 'none';
+    _deleteFolderId = 0;
+    _deleteFolderName = '';
+}
+
+function checkFolderDeleteConfirm() {
+    var input = document.getElementById('folder-delete-confirm-input');
+    var btn = document.getElementById('folder-delete-confirm-btn');
+    btn.disabled = (input.value.trim() !== _deleteFolderName);
+}
+
+function executeDeleteFolder() {
+    if (!_deleteFolderId) return;
+    var fid = _deleteFolderId;
+    closeFolderDeleteModal();
+    fetch('api/messages.php?action=delete_folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'action=delete_folder&folder_id=' + fid
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            showToast('Folder deleted', 'success');
+            setTimeout(function() { window.location = 'index.php?page=inbox'; }, 500);
+        } else {
+            showToast(data.error || 'Failed to delete', 'error');
+        }
+    });
+}
+
+// ============ DRAFT BATCH DELETE ============
+function confirmDraftDelete() {
+    var ids = getSelectedIds();
+    if (ids.length === 0) {
+        showToast('No drafts selected', 'error');
+        return;
+    }
+    customConfirm('Permanently delete ' + ids.length + ' selected draft(s)?', function() {
+        var completed = 0;
+        var total = ids.length;
+        for (var i = 0; i < ids.length; i++) {
+            (function(id) {
+                fetch('api/messages.php?action=delete_draft', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'action=delete_draft&message_id=' + id
+                })
+                .then(function(r) { return r.json(); })
+                .then(function() {
+                    completed++;
+                    if (completed === total) {
+                        showToast(total + ' draft(s) deleted', 'success');
+                        setTimeout(function() { window.location.reload(); }, 600);
+                    }
+                })
+                .catch(function() { completed++; });
+            })(ids[i]);
+        }
     });
 }
 
@@ -879,6 +1202,27 @@ document.addEventListener('keydown', function(e) {
             }
         }
         if (dropdownClosed) return;
+
+        // 0.5 Folder delete modal
+        var folderDeleteModal = document.getElementById('folder-delete-modal');
+        if (folderDeleteModal && folderDeleteModal.style.display !== 'none' && folderDeleteModal.style.display !== '') {
+            closeFolderDeleteModal();
+            return;
+        }
+
+        // 0.6 Folder input modal
+        var folderInputModal = document.getElementById('folder-input-modal');
+        if (folderInputModal && folderInputModal.style.display !== 'none' && folderInputModal.style.display !== '') {
+            closeFolderInputModal();
+            return;
+        }
+
+        // 0.7 Move-to modal
+        var moveToModal = document.getElementById('move-to-modal');
+        if (moveToModal && moveToModal.style.display !== 'none' && moveToModal.style.display !== '') {
+            closeMoveToModal();
+            return;
+        }
 
         // 1. Custom Dialog Modal (Alert/Confirm)
         var customDialog = document.getElementById('custom-dialog-modal');
@@ -935,3 +1279,4 @@ document.addEventListener('keydown', function(e) {
         }
     }
 });
+

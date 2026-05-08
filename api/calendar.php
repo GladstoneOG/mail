@@ -322,6 +322,7 @@ function send_event_invitation($conn, $eventId, $title, $startTime, $endTime, $l
         }
         $attendeesHtml = "<p class='cal-invite-row'><b class='cal-invite-label'>Also invited:</b> " . implode(', ', $names) . "</p>";
     }
+    $eventDate = date('Y-m-d', strtotime($startTime));
     $body = "<div class='cal-invite-card'>"
           . "<div class='cal-invite-icon'>📅</div>"
           . "<h3 class='cal-invite-title'>Event Invitation</h3>"
@@ -333,7 +334,7 @@ function send_event_invitation($conn, $eventId, $title, $startTime, $endTime, $l
           . $descHtml
           . $attendeesHtml
           . "</div>"
-          . "<p style='margin-top:10px'><a href='index.php?page=calendar' class='cal-invite-btn'>Open Calendar →</a></p>"
+          . "<p style='margin-top:10px'><a href='index.php?page=calendar&view=day&date={$eventDate}&event={$eventId}' class='cal-invite-btn'>Open Calendar →</a></p>"
           . "</div>";
     $subject = "📅 Event Invitation: " . $title;
     $msgId = db_insert_get_id($conn,

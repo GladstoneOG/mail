@@ -33,6 +33,17 @@ if (db_table_exists($conn, 'cal_events')) {
         $_SESSION['cal_reminder_shown'] = true;
     }
 }
+
+// Load user folders for sidebar
+$_userFolders = array();
+if (db_table_exists($conn, 'mail_folders')) {
+    $_userFolders = db_fetch_all($conn,
+        "SELECT f.*, (SELECT COUNT(*) FROM mail_recipients mr JOIN mail_messages m ON mr.message_id=m.id WHERE mr.recipient_id=? AND mr.folder_id=f.id AND mr.is_deleted=0 AND m.is_draft=0) AS msg_count
+         FROM mail_folders f WHERE f.user_id = ? ORDER BY f.sort_order, f.name",
+        array(auth_user_id(), auth_user_id()));
+}
+$_activeFolderId = ($_activePage === 'folder' && isset($_GET['fid'])) ? intval($_GET['fid']) : 0;
+$_foldersExpanded = isset($_COOKIE['folders_expanded']) ? $_COOKIE['folders_expanded'] : '0';
 ?>
 <!DOCTYPE html>
 <html lang="en" data-theme="<?php echo e($_theme); ?>">
@@ -55,6 +66,7 @@ if (db_table_exists($conn, 'cal_events')) {
             <a href="index.php?page=compose" class="compose-btn">
                 <span class="compose-icon">&#x1F4E7;</span> Compose
             </a>
+            <div class="sidebar-scroll-area">
             <nav class="sidebar-nav">
                 <a href="index.php?page=inbox" class="nav-item <?php echo $_activePage === 'inbox' ? 'active' : ''; ?>">
                     <span class="nav-icon">&#x1F4E5;</span><span class="nav-label">Inbox</span>
@@ -74,6 +86,32 @@ if (db_table_exists($conn, 'cal_events')) {
                     <span class="nav-icon">&#x1F6AE;</span><span class="nav-label">Trash</span>
                 </a>
                 <div class="nav-divider"></div>
+                <!-- Collapsible Folders Section -->
+                <div class="nav-folders-section" id="folders-section">
+                    <button class="nav-folders-toggle" id="folders-toggle" onclick="toggleFoldersSection()" title="Folders">
+                        <span class="nav-icon">&#x1F4C1;</span>
+                        <span class="nav-label">Folders</span>
+                        <span class="folders-chevron" id="folders-chevron"><?php echo $_foldersExpanded === '1' ? '&#x25BC;' : '&#x25B6;'; ?></span>
+                    </button>
+                    <div class="nav-folders-list" id="folders-list" style="display:<?php echo $_foldersExpanded === '1' ? 'block' : 'none'; ?>">
+                        <?php foreach ($_userFolders as $f): ?>
+                        <a href="index.php?page=folder&fid=<?php echo $f['id']; ?>" class="nav-item nav-folder-item <?php echo $_activeFolderId === intval($f['id']) ? 'active' : ''; ?>"
+                           data-folder-id="<?php echo $f['id']; ?>"
+                           oncontextmenu="event.preventDefault();showFolderContextMenu(event,<?php echo $f['id']; ?>,'<?php echo e(addslashes($f['name'])); ?>')">
+                            <span class="nav-folder-dot" style="background:<?php echo e($f['color']); ?>"></span>
+                            <span class="nav-label"><?php echo e($f['name']); ?></span>
+                            <?php if (intval($f['msg_count']) > 0): ?>
+                                <span class="badge badge-muted"><?php echo intval($f['msg_count']); ?></span>
+                            <?php endif; ?>
+                        </a>
+                        <?php endforeach; ?>
+                        <button class="nav-item nav-add-folder" onclick="promptCreateFolder()" title="Create new folder">
+                            <span class="nav-icon" style="font-size:13px">+</span>
+                            <span class="nav-label" style="font-size:12px;color:var(--text3)">New folder</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="nav-divider"></div>
                 <a href="index.php?page=calendar" class="nav-item <?php echo $_activePage === 'calendar' ? 'active' : ''; ?>">
                     <span class="nav-icon">&#x1F4C5;</span><span class="nav-label">Calendar</span>
                     <?php if ($_calTodayCount > 0): ?><span class="badge"><?php echo $_calTodayCount; ?></span><?php endif; ?>
@@ -86,6 +124,7 @@ if (db_table_exists($conn, 'cal_events')) {
                 <?php endif; ?>
             </nav>
             <div class="sidebar-mini-cal" id="sidebar-mini-cal"></div>
+            </div>
             <div class="sidebar-footer">
                 <a href="index.php?page=profile" class="user-card <?php echo $_activePage === 'profile' ? 'active' : ''; ?>">
                     <div class="avatar-sm" style="background:<?php echo get_avatar_color($currentUser['display_name']); ?>">
@@ -102,7 +141,13 @@ if (db_table_exists($conn, 'cal_events')) {
         <main class="main-content" data-page="<?php echo e($_activePage); ?>">
             <div class="topbar">
                 <button class="mobile-menu-btn" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#x2630;</button>
-                <div class="topbar-title"><?php echo e(ucfirst($_activePage)); ?></div>
+                <div class="topbar-title"><?php
+                    if ($_activePage === 'folder' && isset($folder)) {
+                        echo '&#x1F4C1; ' . e($folder['name']);
+                    } else {
+                        echo e(ucfirst($_activePage));
+                    }
+                ?></div>
                 <div class="topbar-actions">
                     <button class="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode" id="theme-toggle">
                         <?php echo $_theme === 'light' ? '&#x1F319;' : '&#x1F506;'; ?>
@@ -142,12 +187,25 @@ if (db_table_exists($conn, 'cal_events')) {
                 </div>
             </div>
 <?php
-$_listPages = array('inbox', 'starred', 'sent', 'trash', 'drafts');
+$_listPages = array('inbox', 'starred', 'sent', 'trash', 'drafts', 'folder');
 $_isListPage = in_array($_activePage, $_listPages);
 ?>
 <?php if ($_isListPage): ?>
             <div class="action-bar" id="action-bar">
                 <div class="action-buttons" id="action-buttons">
+<?php if ($_activePage === 'drafts'): ?>
+                    <!-- DRAFTS PAGE: only search + batch delete, no refresh/move -->
+                    <button class="btn btn-action btn-sm action-btn" id="trash-toggle-btn" onclick="toggleTrashMode()" title="Select to delete drafts">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        <span class="action-label">Delete</span>
+                    </button>
+                    <button class="btn btn-danger btn-sm action-btn" id="trash-confirm-btn" onclick="confirmDraftDelete()" style="display:none" title="Confirm delete">
+                        &#x2714;&#xFE0F; Confirm
+                    </button>
+                    <button class="btn btn-ghost btn-sm action-btn" id="trash-cancel-btn" onclick="cancelTrashMode()" style="display:none" title="Cancel">
+                        &#x274C; Cancel
+                    </button>
+<?php else: ?>
                     <button class="btn btn-action btn-sm action-btn" onclick="refreshPage()" title="Refresh">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                         <span class="action-label">Refresh</span>
@@ -158,9 +216,11 @@ $_isListPage = in_array($_activePage, $_listPages);
                         <span class="action-label">Mark all read</span>
                     </button>
 <?php endif; ?>
-                    <button class="btn btn-action btn-sm action-btn" id="trash-toggle-btn" onclick="toggleTrashMode()" title="<?php echo $_activePage === 'trash' ? 'Select to delete permanently' : 'Select to move to trash'; ?>">
+<?php if ($_activePage === 'trash'): ?>
+                    <!-- TRASH PAGE: delete permanently -->
+                    <button class="btn btn-action btn-sm action-btn" id="trash-toggle-btn" onclick="toggleTrashMode()" title="Select to delete permanently">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                        <span class="action-label"><?php echo $_activePage === 'trash' ? 'Delete' : 'Trash'; ?></span>
+                        <span class="action-label">Delete</span>
                     </button>
                     <button class="btn btn-danger btn-sm action-btn" id="trash-confirm-btn" onclick="confirmTrashAction()" style="display:none" title="Confirm">
                         &#x2714;&#xFE0F; Confirm
@@ -168,9 +228,46 @@ $_isListPage = in_array($_activePage, $_listPages);
                     <button class="btn btn-ghost btn-sm action-btn" id="trash-cancel-btn" onclick="cancelTrashMode()" style="display:none" title="Cancel">
                         &#x274C; Cancel
                     </button>
+<?php else: ?>
+                    <!-- NON-TRASH/NON-DRAFT PAGES: "Move to" button -->
+                    <button class="btn btn-action btn-sm action-btn" id="trash-toggle-btn" onclick="toggleTrashMode()" title="Select to move">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                            <line x1="12" y1="11" x2="12" y2="17"></line>
+                            <polyline points="9 14 12 17 15 14"></polyline>
+                        </svg>
+                        <span class="action-label">Move to</span>
+                    </button>
+                    <button class="btn btn-primary btn-sm action-btn" id="trash-confirm-btn" onclick="openMoveToModal()" style="display:none" title="Move selected">
+                        &#x1F4C2; Move
+                    </button>
+                    <button class="btn btn-ghost btn-sm action-btn" id="trash-cancel-btn" onclick="cancelTrashMode()" style="display:none" title="Cancel">
+                        &#x274C; Cancel
+                    </button>
+<?php if ($_activePage === 'folder' && isset($folder)): ?>
+                    <!-- FOLDER PAGE: Rename + Delete folder buttons -->
+                    <span class="action-separator"></span>
+                    <button class="btn btn-action btn-sm action-btn" onclick="toolbarRenameFolder()" title="Rename this folder">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        <span class="action-label">Rename</span>
+                    </button>
+                    <button class="btn btn-action btn-sm action-btn folder-delete-toolbar-btn" onclick="toolbarDeleteFolder()" title="Delete this folder">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        <span class="action-label">Delete Folder</span>
+                    </button>
+                    <script>
+                        var _toolbarFolderId = <?php echo intval($folder['id']); ?>;
+                        var _toolbarFolderName = <?php echo json_encode($folder['name']); ?>;
+                    </script>
+<?php endif; ?>
+<?php endif; ?>
+<?php endif; ?>
                 </div>
                 <form class="search-form action-search" method="GET" id="global-search-form">
                     <input type="hidden" name="page" value="<?php echo e($_activePage); ?>">
+                    <?php if ($_activePage === 'folder' && isset($_GET['fid'])): ?>
+                        <input type="hidden" name="fid" value="<?php echo intval($_GET['fid']); ?>">
+                    <?php endif; ?>
                     <input type="text" name="q" placeholder="Search messages..." value="<?php echo isset($_GET['q']) ? e($_GET['q']) : ''; ?>" class="search-input">
                     <button type="submit" class="search-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></button>
                 </form>

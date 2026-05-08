@@ -33,7 +33,42 @@ window.addEventListener('DOMContentLoaded', function(){
         if(document.getElementById('cal-today-btn')) document.getElementById('cal-today-btn').style.display = 'none';
         if(document.getElementById('cal-next')) document.getElementById('cal-next').style.display = 'none';
     }
-    loadEvents();
+    // Check for event deep-link param (from invitation emails)
+    var eventParam = params.get('event');
+    if(eventParam){
+        // Load events first, then auto-show the event detail
+        var origLoadEvents = loadEvents;
+        loadEvents = function(){
+            var start, end;
+            if(currentView==='month'){
+                var y=viewDate.getFullYear(), m=viewDate.getMonth();
+                start = new Date(y,m,1); start.setDate(start.getDate()-start.getDay());
+                end = new Date(y,m+1,0); end.setDate(end.getDate()+(6-end.getDay()));
+            } else if(currentView==='day'){
+                start = new Date(viewDate); start.setHours(0,0,0,0);
+                end = new Date(viewDate); end.setHours(23,59,59,999);
+            } else {
+                start = new Date(viewDate); start.setHours(0,0,0,0);
+                end = new Date(viewDate); end.setDate(end.getDate()+365); end.setHours(23,59,59,999);
+            }
+            var s = fmt(start), e = fmt(end);
+            fetch('api/calendar.php?action=get_events&start='+s+'&end='+e)
+                .then(function(r){return r.json();})
+                .then(function(d){
+                    cachedEvents = d.events||[];
+                    renderView();
+                    updateSidebarMini();
+                    // Auto-show event detail after first load
+                    if(eventParam){
+                        setTimeout(function(){ showEventDetail(parseInt(eventParam,10)); }, 300);
+                        eventParam = null; // Only show once
+                    }
+                }).catch(function(){});
+        };
+        loadEvents();
+    } else {
+        loadEvents();
+    }
     setupColorPicker();
     setupAttendeeAutocomplete();
     setupTimeInputs();

@@ -55,6 +55,14 @@ foreach ($recipients as $r) {
 $attachments = db_fetch_all($conn, "SELECT * FROM mail_attachments WHERE message_id = ?", array($msgId));
 $starred = $recipRow ? $recipRow['is_starred'] : false;
 $backPage = isset($_GET['from']) ? $_GET['from'] : 'inbox';
+
+// Check if the current user has replied to this message
+$replyInfo = null;
+if ($recipRow) {
+    $replyInfo = db_fetch_one($conn,
+        "SELECT m.id, m.sent_at FROM mail_messages m WHERE m.sender_id = ? AND m.reply_to_id = ? AND m.is_draft = 0 ORDER BY m.sent_at DESC",
+        array($userId, $msgId));
+}
 ?>
 
 <div class="page-header">
@@ -98,6 +106,13 @@ $backPage = isset($_GET['from']) ? $_GET['from'] : 'inbox';
             </div>
         </div>
     </div>
+    <?php if ($replyInfo): ?>
+    <div class="reply-info-bar" onclick="window.location='index.php?page=view&id=<?php echo $replyInfo['id']; ?>&from=sent'" title="Click to view your reply" style="cursor:pointer">
+        <span class="reply-info-icon">&#x21A9;</span>
+        <span>You replied on <?php echo format_date($replyInfo['sent_at']); ?></span>
+        <span class="reply-info-arrow">&#x2192;</span>
+    </div>
+    <?php endif; ?>
     <div class="message-body"><?php echo sanitize_html($msg['body']); ?></div>
 
     <?php if (!empty($attachments)): ?>

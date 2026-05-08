@@ -6,7 +6,23 @@
 
 function auth_start_session() {
     if (session_status() === PHP_SESSION_NONE) {
+        // Use a unique session name to prevent conflicts with other apps on the same server
+        session_name('RSPIK_INBOX_SID');
+        // Determine the base path for the cookie (e.g. /development/INBOX/)
+        $scriptDir = dirname($_SERVER['SCRIPT_NAME']);
+        // Normalize: ensure trailing slash
+        $cookiePath = rtrim($scriptDir, '/') . '/';
+        session_set_cookie_params(0, $cookiePath);
         session_start();
+        // Validate session belongs to this app (extra safety)
+        if (!isset($_SESSION['_app_id'])) {
+            $_SESSION['_app_id'] = 'rspik_inbox';
+        } elseif ($_SESSION['_app_id'] !== 'rspik_inbox') {
+            // Session hijacked from another app - destroy and restart
+            session_destroy();
+            session_start();
+            $_SESSION['_app_id'] = 'rspik_inbox';
+        }
     }
 }
 

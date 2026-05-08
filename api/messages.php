@@ -24,6 +24,7 @@ case 'send':
     $draftId = isset($_POST['draft_id']) ? intval($_POST['draft_id']) : 0;
     $isDraft = isset($_POST['is_draft']) ? intval($_POST['is_draft']) : 0;
     $forwardAttachments = isset($_POST['forward_attachments']) ? trim($_POST['forward_attachments']) : '';
+    $replyToId = isset($_POST['reply_to_id']) ? intval($_POST['reply_to_id']) : 0;
 
     if (!$subject) $subject = '(No Subject)';
     $toUsers = parse_recipients($conn, $to);
@@ -47,9 +48,9 @@ case 'send':
     $hasAttachments = (!empty($_FILES['attachments']) && $_FILES['attachments']['error'][0] !== UPLOAD_ERR_NO_FILE) ? 1 : 0;
     if ($forwardAttachments) $hasAttachments = 1;
 
-    $sql = "INSERT INTO mail_messages (sender_id, subject, body, is_draft, has_attachments, sender_deleted, created_at, sent_at)
-            VALUES (?, ?, ?, ?, ?, 0, GETDATE(), " . ($isDraft ? "NULL" : "GETDATE()") . ")";
-    $msgId = db_insert_get_id($conn, $sql, array($userId, $subject, $body, $isDraft, $hasAttachments));
+    $sql = "INSERT INTO mail_messages (sender_id, subject, body, is_draft, has_attachments, sender_deleted, reply_to_id, created_at, sent_at)
+            VALUES (?, ?, ?, ?, ?, 0, ?, GETDATE(), " . ($isDraft ? "NULL" : "GETDATE()") . ")";
+    $msgId = db_insert_get_id($conn, $sql, array($userId, $subject, $body, $isDraft, $hasAttachments, $replyToId > 0 ? $replyToId : null));
     if (!$msgId) json_response(array('error' => 'Failed to create message'), 500);
 
     // Insert recipients
@@ -228,6 +229,75 @@ case 'batch_delete':
         db_execute($conn, "UPDATE mail_messages SET sender_deleted = 1 WHERE id = ? AND sender_id = ?",
             array($mid, $userId));
     }
+    json_response(array('success' => true));
+    break;
+
+case 'batch_move_to_folder':
+    $ids = isset($_POST['ids']) ? $_POST['ids'] : '';
+    $folderId = isset($_POST['folder_id']) ? $_POST['folder_id'] : '';
+    if (!$ids) json_response(array('error' => 'No messages selected'), 400);
+    $idArr = array_map('intval', explode(',', $ids));
+    if ($folderId === 'trash') {
+        // Move to trash
+        foreach ($idArr as $mid) {
+            if ($mid <= 0) continue;
+            db_execute($conn, "UPDATE mail_recipients SET is_deleted = 1, deleted_at = GETDATE() WHERE message_id = ? AND recipient_id = ?",
+                array($mid, $userId));
+            db_execute($conn, "UPDATE mail_messages SET sender_deleted = 1 WHERE id = ? AND sender_id = ?",
+                array($mid, $userId));
+        }
+    } else {
+        $fid = intval($folderId);
+        // Verify folder belongs to user
+        if ($fid > 0) {
+            $folder = db_fetch_one($conn, "SELECT id FROM mail_folders WHERE id = ? AND user_id = ?", array($fid, $userId));
+            if (!$folder) json_response(array('error' => 'Folder not found'), 404);
+        }
+        foreach ($idArr as $mid) {
+            if ($mid <= 0) continue;
+            db_execute($conn, "UPDATE mail_recipients SET folder_id = ? WHERE message_id = ? AND recipient_id = ?",
+                array($fid > 0 ? $fid : null, $mid, $userId));
+        }
+    }
+    json_response(array('success' => true));
+    break;
+
+case 'get_folders':
+    $folders = db_fetch_all($conn, "SELECT f.*, (SELECT COUNT(*) FROM mail_recipients mr JOIN mail_messages m ON mr.message_id=m.id WHERE mr.recipient_id=? AND mr.folder_id=f.id AND mr.is_deleted=0 AND m.is_draft=0) AS msg_count FROM mail_folders f WHERE f.user_id = ? ORDER BY f.sort_order, f.name", array($userId, $userId));
+    json_response(array('folders' => $folders));
+    break;
+
+case 'create_folder':
+    $name = isset($_POST['name']) ? trim($_POST['name']) : '';
+    $color = isset($_POST['color']) ? trim($_POST['color']) : '#6366f1';
+    if (!$name) json_response(array('error' => 'Folder name is required'), 400);
+    if (strlen($name) > 100) json_response(array('error' => 'Folder name too long'), 400);
+    // Check duplicate
+    $existing = db_fetch_one($conn, "SELECT id FROM mail_folders WHERE user_id = ? AND name = ?", array($userId, $name));
+    if ($existing) json_response(array('error' => 'Folder already exists'), 400);
+    $folderId = db_insert_get_id($conn, "INSERT INTO mail_folders (user_id, name, color) VALUES (?, ?, ?)", array($userId, $name, $color));
+    if (!$folderId) json_response(array('error' => 'Failed to create folder'), 500);
+    json_response(array('success' => true, 'id' => $folderId));
+    break;
+
+case 'rename_folder':
+    $folderId = isset($_POST['folder_id']) ? intval($_POST['folder_id']) : 0;
+    $name = isset($_POST['name']) ? trim($_POST['name']) : '';
+    if (!$folderId || !$name) json_response(array('error' => 'Missing data'), 400);
+    $folder = db_fetch_one($conn, "SELECT id FROM mail_folders WHERE id = ? AND user_id = ?", array($folderId, $userId));
+    if (!$folder) json_response(array('error' => 'Folder not found'), 404);
+    db_execute($conn, "UPDATE mail_folders SET name = ? WHERE id = ?", array($name, $folderId));
+    json_response(array('success' => true));
+    break;
+
+case 'delete_folder':
+    $folderId = isset($_POST['folder_id']) ? intval($_POST['folder_id']) : 0;
+    if (!$folderId) json_response(array('error' => 'Missing folder ID'), 400);
+    $folder = db_fetch_one($conn, "SELECT id FROM mail_folders WHERE id = ? AND user_id = ?", array($folderId, $userId));
+    if (!$folder) json_response(array('error' => 'Folder not found'), 404);
+    // Move all messages back to inbox (null folder_id)
+    db_execute($conn, "UPDATE mail_recipients SET folder_id = NULL WHERE folder_id = ? AND recipient_id = ?", array($folderId, $userId));
+    db_execute($conn, "DELETE FROM mail_folders WHERE id = ?", array($folderId));
     json_response(array('success' => true));
     break;
 

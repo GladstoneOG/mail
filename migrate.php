@@ -118,5 +118,49 @@ if (!db_table_exists($conn, 'cal_reminders_sent')) {
     $msgs[] = 'cal_reminders_sent already exists';
 }
 
+// ── Folders table ──
+if (!db_table_exists($conn, 'mail_folders')) {
+    $sql = "CREATE TABLE mail_folders (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        user_id INT NOT NULL,
+        name NVARCHAR(100) NOT NULL,
+        color NVARCHAR(20) NOT NULL DEFAULT '#6366f1',
+        sort_order INT NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_folder_user FOREIGN KEY (user_id) REFERENCES mail_users(id)
+    )";
+    $r = sqlsrv_query($conn, $sql);
+    $msgs[] = $r ? 'Created table: mail_folders' : 'FAILED mail_folders: ' . print_r(sqlsrv_errors(), true);
+    if ($r) sqlsrv_free_stmt($r);
+    $idxs = array(
+        "CREATE INDEX IX_folder_user ON mail_folders(user_id)",
+        "CREATE UNIQUE INDEX IX_folder_user_name ON mail_folders(user_id, name)"
+    );
+    foreach ($idxs as $ix) { $r = sqlsrv_query($conn, $ix); if ($r) sqlsrv_free_stmt($r); }
+    $msgs[] = 'Created indexes for mail_folders';
+} else {
+    $msgs[] = 'mail_folders already exists';
+}
+
+// ── folder_id column on mail_recipients ──
+$check = db_fetch_one($conn, "SELECT COL_LENGTH('mail_recipients','folder_id') AS len");
+if (!$check || $check['len'] === null) {
+    $r = sqlsrv_query($conn, "ALTER TABLE mail_recipients ADD folder_id INT NULL");
+    $msgs[] = $r ? 'Added folder_id column to mail_recipients' : 'FAILED folder_id';
+    if ($r) sqlsrv_free_stmt($r);
+    $r2 = sqlsrv_query($conn, "CREATE INDEX IX_recip_folder ON mail_recipients(folder_id)");
+    if ($r2) sqlsrv_free_stmt($r2);
+} else { $msgs[] = 'folder_id already exists on mail_recipients'; }
+
+// ── reply_to_id column on mail_messages ──
+$check = db_fetch_one($conn, "SELECT COL_LENGTH('mail_messages','reply_to_id') AS len");
+if (!$check || $check['len'] === null) {
+    $r = sqlsrv_query($conn, "ALTER TABLE mail_messages ADD reply_to_id INT NULL");
+    $msgs[] = $r ? 'Added reply_to_id column to mail_messages' : 'FAILED reply_to_id';
+    if ($r) sqlsrv_free_stmt($r);
+    $r2 = sqlsrv_query($conn, "CREATE INDEX IX_msg_reply_to ON mail_messages(reply_to_id)");
+    if ($r2) sqlsrv_free_stmt($r2);
+} else { $msgs[] = 'reply_to_id already exists on mail_messages'; }
+
 echo '<pre>Migration results: ' . implode("\n", $msgs) . '</pre>';
 echo '<a href="index.php">Go to app</a>';
