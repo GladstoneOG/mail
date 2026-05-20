@@ -72,6 +72,25 @@ $_foldersExpanded = isset($_COOKIE['folders_expanded']) ? $_COOKIE['folders_expa
             }
             document.cookie = "mini_cal_collapsed=" + (isCollapsed ? "1" : "0") + "; path=/; max-age=" + (365*24*60*60);
         }
+
+        // Restore and save sidebar scroll position
+        document.addEventListener('DOMContentLoaded', function() {
+            var scrollArea = document.querySelector('.sidebar-scroll-area');
+            if (scrollArea) {
+                var match = document.cookie.match(/(?:^|; )sidebar_scroll=(\d+)/);
+                if (match) {
+                    scrollArea.scrollTop = parseInt(match[1], 10);
+                }
+                
+                var timeout;
+                scrollArea.addEventListener('scroll', function() {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(function() {
+                        document.cookie = "sidebar_scroll=" + scrollArea.scrollTop + "; path=/; max-age=" + (365*24*60*60);
+                    }, 150);
+                });
+            }
+        });
     </script>
 </head>
 <body>
