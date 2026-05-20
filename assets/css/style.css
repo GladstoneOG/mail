@@ -249,69 +249,71 @@ a:hover {
     position: relative
 }
 
-.sidebar.collapsed {
-    width: 72px;
-}
+@media (min-width: 769px) {
+    .sidebar.collapsed {
+        width: 72px;
+    }
 
-/* Collapsed Sidebar elements styling */
-.sidebar.collapsed .logo-text,
-.sidebar.collapsed .compose-text,
-.sidebar.collapsed .nav-label,
-.sidebar.collapsed .badge,
-.sidebar.collapsed .nav-cog-btn,
-.sidebar.collapsed .folders-chevron,
-.sidebar.collapsed .user-info,
-.sidebar.collapsed .logout-btn {
-    display: none !important;
-}
+    /* Collapsed Sidebar elements styling */
+    .sidebar.collapsed .logo-text,
+    .sidebar.collapsed .compose-text,
+    .sidebar.collapsed .nav-label,
+    .sidebar.collapsed .badge,
+    .sidebar.collapsed .nav-cog-btn,
+    .sidebar.collapsed .folders-chevron,
+    .sidebar.collapsed .user-info,
+    .sidebar.collapsed .logout-btn {
+        display: none !important;
+    }
 
-.sidebar.collapsed .sidebar-header {
-    padding: 20px 0 16px;
-    display: flex;
-    justify-content: center;
-}
+    .sidebar.collapsed .sidebar-header {
+        padding: 20px 0 16px;
+        display: flex;
+        justify-content: center;
+    }
 
-.sidebar.collapsed .logo {
-    justify-content: center;
-    gap: 0;
-}
+    .sidebar.collapsed .logo {
+        justify-content: center;
+        gap: 0;
+    }
 
-.sidebar.collapsed .compose-btn {
-    margin: 0 auto 16px;
-    padding: 0;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-}
+    .sidebar.collapsed .compose-btn {
+        margin: 0 auto 16px;
+        padding: 0;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+    }
 
-.sidebar.collapsed .nav-item {
-    justify-content: center;
-    padding: 10px 0;
-}
+    .sidebar.collapsed .nav-item {
+        justify-content: center;
+        padding: 10px 0;
+    }
 
-.sidebar.collapsed .nav-folders-toggle {
-    justify-content: center;
-    padding: 10px 0;
-    width: 100%;
-}
+    .sidebar.collapsed .nav-folders-toggle {
+        justify-content: center;
+        padding: 10px 0;
+        width: 100%;
+    }
 
-.sidebar.collapsed .nav-folders-list {
-    display: none !important;
-}
+    .sidebar.collapsed .nav-folders-list {
+        display: none !important;
+    }
 
-.sidebar.collapsed .sidebar-footer {
-    padding: 12px 0;
-    justify-content: center;
-}
+    .sidebar.collapsed .sidebar-footer {
+        padding: 12px 0;
+        justify-content: center;
+    }
 
-.sidebar.collapsed .sidebar-footer .user-card {
-    justify-content: center;
-    padding: 8px 0;
-}
+    .sidebar.collapsed .sidebar-footer .user-card {
+        justify-content: center;
+        padding: 8px 0;
+    }
 
-.sidebar.collapsed #sidebar-mini-cal-container {
-    display: none !important;
+    .sidebar.collapsed #sidebar-mini-cal-container {
+        display: none !important;
+    }
 }
 
 .sidebar::before {
@@ -328,7 +330,8 @@ a:hover {
 
 .sidebar-header {
     padding: 20px 20px 16px;
-    position: relative
+    position: relative;
+    cursor: pointer;
 }
 
 .sidebar-header::after {

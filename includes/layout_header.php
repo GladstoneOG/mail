@@ -58,6 +58,11 @@ $_foldersExpanded = isset($_COOKIE['folders_expanded']) ? $_COOKIE['folders_expa
     <link rel="icon" type="image/png" href="assets/icon.png" id="favicon">
     <script>
         function toggleSidebar() {
+            if (window.innerWidth <= 768) {
+                // On mobile, collapse means closing the sidebar entirely (removing .open class)
+                document.querySelector('.sidebar').classList.remove('open');
+                return;
+            }
             var sidebar = document.querySelector('.sidebar');
             var isCollapsed = sidebar.classList.toggle('collapsed');
             document.cookie = "sidebar_collapsed=" + (isCollapsed ? "1" : "0") + "; path=/; max-age=" + (365*24*60*60);
@@ -72,6 +77,19 @@ $_foldersExpanded = isset($_COOKIE['folders_expanded']) ? $_COOKIE['folders_expa
             }
             document.cookie = "mini_cal_collapsed=" + (isCollapsed ? "1" : "0") + "; path=/; max-age=" + (365*24*60*60);
         }
+
+        // Close mobile sidebar on clicking outside
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth <= 768) {
+                var sidebar = document.querySelector('.sidebar');
+                var mobileBtn = document.querySelector('.mobile-menu-btn');
+                if (sidebar && sidebar.classList.contains('open')) {
+                    if (!sidebar.contains(e.target) && (!mobileBtn || !mobileBtn.contains(e.target))) {
+                        sidebar.classList.remove('open');
+                    }
+                }
+            }
+        });
 
         // Restore and save sidebar scroll position
         document.addEventListener('DOMContentLoaded', function() {
