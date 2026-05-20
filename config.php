@@ -8,3 +8,4 @@ define('ITEMS_PER_PAGE', 25);
 define('NOTIFICATION_POLL_INTERVAL', 10000); // 15 seconds in ms
 define('CALENDAR_WIDGET_REFRESH_INTERVAL', 10000); // 30 seconds in ms – sidebar mini calendar auto-refresh
 define('ALLOW_SELF_REGISTRATION', false); // true = anyone can create an account; false = admin-only registration
+define('AIRGAPPED_MODE', false); // true = run on an air-gapped system (uses local assets); false = use online CDNs

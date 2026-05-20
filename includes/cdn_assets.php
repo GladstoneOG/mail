@@ -5,15 +5,15 @@
  * This file gathers all external CDN URLs in one central place.
  * 
  * TO DEPLOY ON AN AIR-GAPPED SYSTEM:
- * 1. Set AIRGAPPED_MODE to true.
+ * 1. Set AIRGAPPED_MODE to true in config.php.
  * 2. Download the external files listed below.
  * 3. Place them in your local web root directory (we recommend assets/vendor/).
  * 4. Update the LOCAL_* constants below to point to your offline files.
  */
 
-// Toggle this to true when deploying on an air-gapped system.
+// Central toggle fallback (should be configured in config.php)
 if (!defined('AIRGAPPED_MODE')) {
-    define('AIRGAPPED_MODE', true);
+    define('AIRGAPPED_MODE', false);
 }
 
 // -----------------------------------------------------------------------------
