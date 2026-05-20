@@ -11,6 +11,7 @@ $draftId = isset($_GET['draft']) ? intval($_GET['draft']) : 0;
 $prefillTo = ''; $prefillCc = ''; $prefillSubject = ''; $prefillBody = '';
 $forwardAttIds = array();
 $replyToId = 0;
+$forwardedFromId = 0;
 
 $user = db_fetch_one($conn, "SELECT email_footer FROM mail_users WHERE id = ?", array($userId));
 $footerHtml = '';
@@ -18,21 +19,33 @@ if (false && $user && !empty($user['email_footer'])) {
     $footerHtml = '<br><br><hr style="border:none;border-top:1px solid var(--border);margin:10px 0;"><div class="email-footer">' . $user['email_footer'] . '</div>';
 }
 
-if ($replyId || $replyAllId) {
-    $origId = $replyId ? $replyId : $replyAllId;
+$orig = null;
+$origAtts = array();
+if ($replyId || $replyAllId || $forwardId) {
+    $origId = $replyId ? $replyId : ($replyAllId ? $replyAllId : $forwardId);
     $orig = db_fetch_one($conn, "SELECT m.*, u.display_name AS sender_name, u.username AS sender_username
                                   FROM mail_messages m JOIN mail_users u ON m.sender_id = u.id WHERE m.id = ?", array($origId));
     if ($orig) {
-        $replyToId = $origId;
+        $origAtts = db_fetch_all($conn, "SELECT id, original_name, file_size FROM mail_attachments WHERE message_id = ?", array($origId));
+    }
+}
+
+if ($replyId || $replyAllId) {
+    if ($orig) {
+        if (intval($orig['sender_id']) === $userId) {
+            echo "<div class='container' style='margin-top:20px;'><div class='alert alert-error'>You cannot reply to your own message.</div></div>";
+            return;
+        }
+        $replyToId = $orig['id'];
         $prefillTo = $orig['sender_username'];
         $prefillSubject = 'Re: ' . preg_replace('/^Re:\s*/i', '', $orig['subject']);
-        $prefillBody = $footerHtml . '<br><br><div style="border-left:3px solid #555;padding-left:12px;color:#888;">--- Original Message from ' . e($orig['sender_name']) . ' ---<br>' . $orig['body'] . '</div>';
+        $prefillBody = $footerHtml;
         if ($replyAllId) {
             $others = db_fetch_all($conn, "SELECT u.username FROM mail_recipients mr JOIN mail_users u ON mr.recipient_id = u.id
-                                            WHERE mr.message_id = ? AND mr.recipient_id != ? AND mr.recipient_type = 'to'", array($origId, $userId));
+                                            WHERE mr.message_id = ? AND mr.recipient_id != ? AND mr.recipient_type = 'to'", array($orig['id'], $userId));
             foreach ($others as $o) $prefillTo .= ', ' . $o['username'];
             $ccU = db_fetch_all($conn, "SELECT u.username FROM mail_recipients mr JOIN mail_users u ON mr.recipient_id = u.id
-                                        WHERE mr.message_id = ? AND mr.recipient_type = 'cc'", array($origId));
+                                        WHERE mr.message_id = ? AND mr.recipient_type = 'cc'", array($orig['id']));
             $ccNames = array();
             foreach ($ccU as $c) $ccNames[] = $c['username'];
             $prefillCc = implode(', ', $ccNames);
@@ -41,13 +54,11 @@ if ($replyId || $replyAllId) {
 }
 
 if ($forwardId) {
-    $orig = db_fetch_one($conn, "SELECT m.*, u.display_name AS sender_name FROM mail_messages m
-                                  JOIN mail_users u ON m.sender_id = u.id WHERE m.id = ?", array($forwardId));
     if ($orig) {
+        $forwardedFromId = $forwardId;
         $prefillSubject = 'Fwd: ' . preg_replace('/^Fwd:\s*/i', '', $orig['subject']);
-        $prefillBody = $footerHtml . '<br><br><div style="border-left:3px solid #555;padding-left:12px;color:#888;">--- Forwarded from ' . e($orig['sender_name']) . ' ---<br>' . $orig['body'] . '</div>';
-        $fwdAtts = db_fetch_all($conn, "SELECT id, original_name, file_size FROM mail_attachments WHERE message_id = ?", array($forwardId));
-        foreach ($fwdAtts as $fa) $forwardAttIds[] = $fa;
+        $prefillBody = $footerHtml;
+        foreach ($origAtts as $fa) $forwardAttIds[] = $fa;
     }
 }
 
@@ -129,6 +140,7 @@ $allUsers = db_fetch_all($conn, "SELECT id, username, display_name FROM mail_use
     <input type="hidden" name="csrf_token" value="<?php echo e($csrfToken); ?>">
     <input type="hidden" name="draft_id" value="<?php echo $draftId; ?>">
     <input type="hidden" name="reply_to_id" value="<?php echo $replyToId; ?>">
+    <input type="hidden" name="forwarded_from_id" value="<?php echo $forwardedFromId; ?>">
     <input type="hidden" name="forward_attachments" id="forward_attachments" value="<?php echo implode(',', array_map(function($a){ return $a['id']; }, $forwardAttIds)); ?>">
 
     <div class="form-group">
@@ -187,50 +199,118 @@ $allUsers = db_fetch_all($conn, "SELECT id, username, display_name FROM mail_use
     <input type="hidden" name="scheduled_at" id="scheduled-at-input" value="">
 
     <div class="compose-actions">
-        <div class="schedule-send-wrap" id="schedule-wrap">
-            <button type="submit" class="btn btn-primary" id="send-btn"><span>&#x1F4E8;</span> Send Message</button>
-            <button type="button" class="schedule-dropdown-toggle" id="schedule-toggle-btn" onclick="toggleScheduleDropdown()" title="Schedule Send">&#x25B2;</button>
-            <div class="schedule-dropdown" id="schedule-dropdown">
-                <div class="schedule-header">&#x1F552; Schedule Send</div>
-                <div class="schedule-presets">
-                    <label class="schedule-preset">
-                        <input type="radio" name="schedule_choice" value="now" checked onchange="onScheduleChange()">
-                        <span class="schedule-preset-icon">&#x1F4E8;</span>
-                        <span class="schedule-preset-label">Send now</span>
-                    </label>
-                    <label class="schedule-preset">
-                        <input type="radio" name="schedule_choice" value="today_evening" onchange="onScheduleChange()">
-                        <span class="schedule-preset-icon">&#x1F307;</span>
-                        <span class="schedule-preset-label">Later today <small id="schedule-today-time"></small></span>
-                    </label>
-                    <label class="schedule-preset">
-                        <input type="radio" name="schedule_choice" value="tomorrow_morning" onchange="onScheduleChange()">
-                        <span class="schedule-preset-icon">&#x2600;&#xFE0F;</span>
-                        <span class="schedule-preset-label">Tomorrow morning <small>8:00 AM</small></span>
-                    </label>
-                    <label class="schedule-preset">
-                        <input type="radio" name="schedule_choice" value="next_monday" onchange="onScheduleChange()">
-                        <span class="schedule-preset-icon">&#x1F4C5;</span>
-                        <span class="schedule-preset-label">Next Monday <small>8:00 AM</small></span>
-                    </label>
-                    <label class="schedule-preset">
-                        <input type="radio" name="schedule_choice" value="custom" onchange="onScheduleChange()">
-                        <span class="schedule-preset-icon">&#x1F4DD;</span>
-                        <span class="schedule-preset-label">Custom date & time</span>
-                    </label>
-                </div>
-                <div class="schedule-custom" id="schedule-custom-fields" style="display:none;">
-                    <div class="schedule-custom-row">
-                        <input type="date" id="schedule-date">
-                        <input type="time" id="schedule-time" value="08:00">
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <div class="schedule-send-wrap" id="schedule-wrap">
+                <button type="submit" class="btn btn-primary" id="send-btn"><span>&#x1F4E8;</span> Send Message</button>
+                <button type="button" class="schedule-dropdown-toggle" id="schedule-toggle-btn" onclick="toggleScheduleDropdown()" title="Schedule Send">&#x25B2;</button>
+                <div class="schedule-dropdown" id="schedule-dropdown">
+                    <div class="schedule-header">&#x1F552; Schedule Send</div>
+                    <div class="schedule-presets">
+                        <label class="schedule-preset">
+                            <input type="radio" name="schedule_choice" value="now" checked onchange="onScheduleChange()">
+                            <span class="schedule-preset-icon">&#x1F4E8;</span>
+                            <span class="schedule-preset-label">Send now</span>
+                        </label>
+                        <label class="schedule-preset">
+                            <input type="radio" name="schedule_choice" value="today_evening" onchange="onScheduleChange()">
+                            <span class="schedule-preset-icon">&#x1F307;</span>
+                            <span class="schedule-preset-label">Later today <small id="schedule-today-time"></small></span>
+                        </label>
+                        <label class="schedule-preset">
+                            <input type="radio" name="schedule_choice" value="tomorrow_morning" onchange="onScheduleChange()">
+                            <span class="schedule-preset-icon">&#x2600;&#xFE0F;</span>
+                            <span class="schedule-preset-label">Tomorrow morning <small>8:00 AM</small></span>
+                        </label>
+                        <label class="schedule-preset">
+                            <input type="radio" name="schedule_choice" value="next_monday" onchange="onScheduleChange()">
+                            <span class="schedule-preset-icon">&#x1F4C5;</span>
+                            <span class="schedule-preset-label">Next Monday <small>8:00 AM</small></span>
+                        </label>
+                        <label class="schedule-preset">
+                            <input type="radio" name="schedule_choice" value="custom" onchange="onScheduleChange()">
+                            <span class="schedule-preset-icon">&#x1F4DD;</span>
+                            <span class="schedule-preset-label">Custom date & time</span>
+                        </label>
+                    </div>
+                    <div class="schedule-custom" id="schedule-custom-fields" style="display:none;">
+                        <div class="schedule-custom-row">
+                            <input type="date" id="schedule-date">
+                            <input type="time" id="schedule-time" value="08:00">
+                        </div>
                     </div>
                 </div>
             </div>
+            <button type="button" class="btn btn-secondary" id="draft-btn" onclick="saveDraft()"><span>&#x1F4DD;</span> Save Draft</button>
+            <button type="button" class="btn btn-ghost" onclick="customConfirm('Discard message?', function() { window.hasUnsavedChanges = false; window.location='index.php?page=inbox'; })">Discard</button>
         </div>
-        <button type="button" class="btn btn-secondary" id="draft-btn" onclick="saveDraft()"><span>&#x1F4DD;</span> Save Draft</button>
-        <button type="button" class="btn btn-ghost" onclick="customConfirm('Discard message?', function() { window.hasUnsavedChanges = false; window.location='index.php?page=inbox'; })">Discard</button>
+
+        <?php if ($orig): ?>
+            <button type="button" class="btn btn-secondary" id="ref-trigger-btn" onclick="toggleReferencePanel()" style="margin-left: auto;">
+                <span>&#x1F4D6;</span> View Original Message &#x25B2;
+            </button>
+        <?php endif; ?>
     </div>
-</form>
+    </form>
+
+    <?php if ($orig): ?>
+        <div class="compose-reference-panel" id="reference-panel">
+            <div class="reference-panel-header">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size: 14px;">&#x1F4D6;</span>
+                    <h4>Reference Message</h4>
+                    <span class="reference-type-badge"><?php echo $forwardId ? 'Forward' : 'Reply'; ?></span>
+                </div>
+                <button type="button" onclick="toggleReferencePanel()" style="background:none; border:none; color:var(--text3); font-size:18px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center; width:24px; height:24px;">&times;</button>
+            </div>
+            <div class="reference-panel-body">
+                <div class="reference-meta">
+                    <div><strong>From:</strong> <?php echo e($orig['sender_name']); ?> (@<?php echo e($orig['sender_username']); ?>)</div>
+                    <div style="margin-top: 4px;"><strong>Date:</strong> <?php echo format_date($orig['sent_at'] ? $orig['sent_at'] : $orig['created_at']); ?></div>
+                    <div style="margin-top: 4px;"><strong>Subject:</strong> <?php echo e($orig['subject']); ?></div>
+                </div>
+                
+                <?php if (!empty($origAtts)): ?>
+                    <div class="reference-attachments">
+                        <span class="ref-att-title">&#x1F4CE; Attachments (<?php echo count($origAtts); ?>):</span>
+                        <div class="ref-att-list">
+                            <?php foreach ($origAtts as $oa): ?>
+                                <span class="ref-att-chip" title="<?php echo e($oa['original_name']); ?> (<?php echo format_size($oa['file_size']); ?>)">
+                                    &#x1F4C4; <?php echo e(truncate_text($oa['original_name'], 20)); ?>
+                                </span>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+                
+                <div class="reference-content-body">
+                    <?php echo sanitize_html($orig['body']); ?>
+                </div>
+            </div>
+        </div>
+        
+        <script>
+        function toggleReferencePanel() {
+            var panel = document.getElementById('reference-panel');
+            var btn = document.getElementById('ref-trigger-btn');
+            if (panel) {
+                var isShowing = panel.classList.contains('show');
+                if (isShowing) {
+                    panel.classList.remove('show');
+                    if (btn) {
+                        btn.classList.remove('btn-active');
+                        btn.innerHTML = '<span>&#x1F4D6;</span> View Original Message &#x25B2;';
+                    }
+                } else {
+                    panel.classList.add('show');
+                    if (btn) {
+                        btn.classList.add('btn-active');
+                        btn.innerHTML = '<span>&#x1F4D6;</span> View Original Message &#x25BC;';
+                    }
+                }
+            }
+        }
+        </script>
+    <?php endif; ?>
 
 <script>
 function toggleCcBcc() {

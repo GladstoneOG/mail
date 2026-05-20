@@ -58,6 +58,7 @@ $_foldersExpanded = isset($_COOKIE['folders_expanded']) ? $_COOKIE['folders_expa
     <link rel="icon" type="image/png" href="assets/icon.png" id="favicon">
     <?php render_font_assets(); ?>
     <script>
+        window.CURRENT_USER_USERNAME = <?php echo json_encode($_SESSION['user']['username']); ?>;
         function toggleSidebar() {
             if (window.innerWidth <= 768) {
                 // On mobile, collapse means closing the sidebar entirely (removing .open class)

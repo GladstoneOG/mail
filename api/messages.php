@@ -25,6 +25,7 @@ case 'send':
     $isDraft = isset($_POST['is_draft']) ? intval($_POST['is_draft']) : 0;
     $forwardAttachments = isset($_POST['forward_attachments']) ? trim($_POST['forward_attachments']) : '';
     $replyToId = isset($_POST['reply_to_id']) ? intval($_POST['reply_to_id']) : 0;
+    $forwardedFromId = isset($_POST['forwarded_from_id']) ? intval($_POST['forwarded_from_id']) : 0;
     $scheduledAt = isset($_POST['scheduled_at']) ? trim($_POST['scheduled_at']) : '';
 
     if (!$subject) $subject = '(No Subject)';
@@ -60,8 +61,8 @@ case 'send':
     } else {
         $sentAtVal = $nowStr;
     }
-    $sql = "INSERT INTO mail_messages (sender_id, subject, body, is_draft, has_attachments, sender_deleted, reply_to_id, scheduled_at, created_at, sent_at)
-            VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?)";
+    $sql = "INSERT INTO mail_messages (sender_id, subject, body, is_draft, has_attachments, sender_deleted, reply_to_id, forwarded_from_id, scheduled_at, created_at, sent_at)
+            VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)";
     $params_insert = array(
         $userId, 
         $subject, 
@@ -69,10 +70,12 @@ case 'send':
         $isDraft, 
         $hasAttachments, 
         $replyToId > 0 ? $replyToId : null, 
+        $forwardedFromId > 0 ? $forwardedFromId : null, 
         $isScheduled ? $scheduledAt : null,
         $nowStr, 
         $sentAtVal
     );
+
     $msgId = db_insert_get_id($conn, $sql, $params_insert);
     if (!$msgId) json_response(array('error' => 'Failed to create message'), 500);
 
@@ -351,6 +354,10 @@ case 'batch_permanent_delete':
 case 'mark_unread':
     $messageId = isset($_POST['message_id']) ? intval($_POST['message_id']) : 0;
     if (!$messageId) json_response(array('error' => 'Missing message ID'), 400);
+    $isSender = db_fetch_scalar($conn, "SELECT COUNT(*) FROM mail_messages WHERE id = ? AND sender_id = ?", array($messageId, $userId));
+    if ($isSender > 0) {
+        json_response(array('error' => 'Cannot mark sent messages as unread'), 400);
+    }
     db_execute($conn, "UPDATE mail_recipients SET is_read = 0 WHERE message_id = ? AND recipient_id = ?", array($messageId, $userId));
     json_response(array('success' => true));
     break;

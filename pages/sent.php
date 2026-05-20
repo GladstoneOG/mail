@@ -166,6 +166,7 @@ function sent_sort_link($col, $label, $currentSort, $currentDir) {
                 <?php foreach ($scheduledMessages as $msg): ?>
                     <tr class="msg-row msg-scheduled"
                         data-msg-id="<?php echo $msg['id']; ?>"
+                        data-sender-username="<?php echo e($_SESSION['user']['username']); ?>"
                         onclick="handleRowClick(event, <?php echo $msg['id']; ?>, 'sent')" style="cursor:pointer">
                         <td class="col-select-cell"><input type="checkbox" class="msg-select-cb" value="<?php echo $msg['id']; ?>" onclick="event.stopPropagation()"></td>
                         <td class="col-from-cell">
@@ -199,6 +200,7 @@ function sent_sort_link($col, $label, $currentSort, $currentDir) {
                 <?php foreach ($messages as $msg): ?>
                     <tr class="msg-row"
                         data-msg-id="<?php echo $msg['id']; ?>"
+                        data-sender-username="<?php echo e($_SESSION['user']['username']); ?>"
                         onclick="handleRowClick(event, <?php echo $msg['id']; ?>, 'sent')" style="cursor:pointer">
                         <td class="col-select-cell"><input type="checkbox" class="msg-select-cb" value="<?php echo $msg['id']; ?>" onclick="event.stopPropagation()"></td>
                         <td class="col-from-cell">

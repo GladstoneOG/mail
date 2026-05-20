@@ -61,11 +61,17 @@ function showContextMenu(x, y){
         html += '<button class="ctx-menu-item ctx-danger" onclick="ctxAction(\'delete\')"><span class="ctx-menu-icon">🗑️</span>Delete Permanently</button>';
     } else {
         // Full context menu for inbox, sent, starred, folder
-        html += '<button class="ctx-menu-item" onclick="ctxAction(\'reply\')"><span class="ctx-menu-icon">↩️</span>Reply</button>';
+        if (ctxMsgData.senderUsername !== window.CURRENT_USER_USERNAME) {
+            html += '<button class="ctx-menu-item" onclick="ctxAction(\'reply\')"><span class="ctx-menu-icon">↩️</span>Reply</button>';
+        }
         html += '<button class="ctx-menu-item" onclick="ctxAction(\'forward\')"><span class="ctx-menu-icon">↪️</span>Forward</button>';
         html += '<div class="ctx-menu-sep"></div>';
         html += '<button class="ctx-menu-item" onclick="ctxAction(\'star\')"><span class="ctx-menu-icon">' + (ctxMsgData.starred ? '⭐' : '🌟') + '</span>' + (ctxMsgData.starred ? 'Unstar' : 'Star') + '</button>';
-        html += '<button class="ctx-menu-item" onclick="ctxAction(\'' + (ctxMsgData.isRead ? 'mark_unread' : 'mark_read') + '\')"><span class="ctx-menu-icon">' + (ctxMsgData.isRead ? '✉️' : '📩') + '</span>Mark as ' + (ctxMsgData.isRead ? 'unread' : 'read') + '</button>';
+        if (ctxMsgData.senderUsername !== window.CURRENT_USER_USERNAME) {
+            html += '<button class="ctx-menu-item" onclick="ctxAction(\'' + (ctxMsgData.isRead ? 'mark_unread' : 'mark_read') + '\')"><span class="ctx-menu-icon">' + (ctxMsgData.isRead ? '✉️' : '📩') + '</span>Mark as ' + (ctxMsgData.isRead ? 'unread' : 'read') + '</button>';
+        } else if (!ctxMsgData.isRead) {
+            html += '<button class="ctx-menu-item" onclick="ctxAction(\'mark_read\')"><span class="ctx-menu-icon">📩</span>Mark as read</button>';
+        }
         html += '<div class="ctx-menu-sep"></div>';
         html += '<div class="ctx-menu-sub">Tags</div>';
         html += '<div class="ctx-tag-list" id="ctx-tag-list">';

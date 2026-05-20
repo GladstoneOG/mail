@@ -4649,4 +4649,322 @@ body.trash-mode .message-item:hover {
         transform: scale(0.97);
     }
 }
+
+/* ============ DYNAMIC EMAIL THREADS & FORWARDED MESSAGES ============ */
+.thread-subject {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border);
+}
+
+.thread-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 30px;
+}
+
+.thread-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md, 12px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.thread-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.08);
+}
+
+/* Collapsed state styles */
+.thread-card.collapsed {
+    background: var(--bg2);
+}
+
+.thread-card-collapsed-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 20px;
+    user-select: none;
+}
+
+.thread-card-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.thread-card-collapsed-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex: 1;
+    min-width: 0;
+}
+
+.thread-card-collapsed-sender {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text);
+    white-space: nowrap;
+    width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.thread-card-collapsed-snippet {
+    font-size: 13px;
+    color: var(--text3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+}
+
+.thread-card-collapsed-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.thread-card-collapsed-date {
+    font-size: 12px;
+    color: var(--text3);
+}
+
+.thread-card-expand-icon {
+    font-size: 10px;
+    color: var(--text3);
+    transition: transform 0.2s ease;
+}
+
+.thread-card.expanded .thread-card-expand-icon {
+    transform: rotate(180deg);
+}
+
+/* Expanded state styles */
+.thread-card.collapsed .thread-card-expanded-content {
+    display: none;
+}
+
+.thread-card.expanded .thread-card-collapsed-header {
+    display: none; /* Hide collapsed view in expanded state */
+}
+
+.thread-card-expanded-content {
+    padding: 20px;
+    cursor: default;
+}
+
+.thread-card-actions {
+    display: inline-flex;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.btn-xs {
+    padding: 4px 10px;
+    font-size: 11px;
+    border-radius: 4px;
+}
+
+/* Nested Forwarded Message UI */
+.forwarded-message-container {
+    margin-top: 20px;
+    padding: 16px 20px;
+    background: rgba(255, 255, 255, 0.02);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 10px 10px 0;
+    border-top: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+}
+
+[data-theme="light"] .forwarded-message-container {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.forwarded-message-header {
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed var(--border);
+    color: var(--text2);
+}
+
+.forwarded-label {
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--accent2);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.forwarded-message-body {
+    line-height: 1.6;
+}
+
+/* Light mode adjustments */
+[data-theme="light"] .thread-card {
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .thread-card.collapsed {
+    background: #f8fafc;
+}
+
+/* ============ COMPOSE FLOATING REFERENCE PANEL ============ */
+.compose-reference-panel {
+    position: fixed;
+    bottom: 70px;
+    right: 24px;
+    width: 380px;
+    height: 480px;
+    max-height: calc(100vh - 140px);
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    z-index: 1000;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(20px);
+}
+
+.compose-reference-panel.show {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+.reference-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+    user-select: none;
+    height: 48px;
+    box-sizing: border-box;
+}
+
+.reference-panel-header h4 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.reference-panel-body {
+    padding: 16px;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-sizing: border-box;
+}
+
+.reference-meta {
+    font-size: 12px;
+    color: var(--text2);
+    background: var(--bg);
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.reference-meta strong {
+    color: var(--text3);
+}
+
+.reference-attachments {
+    border-bottom: 1px dashed var(--border);
+    padding-bottom: 10px;
+}
+
+.ref-att-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text2);
+    display: block;
+    margin-bottom: 4px;
+}
+
+.ref-att-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.ref-att-chip {
+    font-size: 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.reference-content-body {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text);
+    overflow-x: auto;
+}
+
+/* Light theme support */
+[data-theme="light"] .compose-reference-panel {
+    background: #fff;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+/* Active style for trigger button */
+#ref-trigger-btn.btn-active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+/* On smaller screens, keep it floating but make it smaller or responsive */
+@media (max-width: 480px) {
+    .compose-reference-panel {
+        width: calc(100% - 40px);
+        right: 20px;
+        left: 20px;
+        bottom: 75px;
+    }
+}
+
+
+
 

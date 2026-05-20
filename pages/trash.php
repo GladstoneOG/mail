@@ -5,9 +5,9 @@
 $userId = auth_user_id();
 $search = isset($_GET['q']) ? trim($_GET['q']) : '';
 
-$sql = "SELECT id, subject, body, has_attachments, sent_at, created_at, sender_name, deleted_at FROM (
+$sql = "SELECT id, subject, body, has_attachments, sent_at, created_at, sender_name, sender_username, deleted_at FROM (
     SELECT m.id, m.subject, m.body, m.has_attachments, m.sent_at, m.created_at,
-            u.display_name AS sender_name, MAX(mr.deleted_at) AS deleted_at
+            u.display_name AS sender_name, u.username AS sender_username, MAX(mr.deleted_at) AS deleted_at
      FROM mail_recipients mr
      JOIN mail_messages m ON mr.message_id = m.id
      JOIN mail_users u ON m.sender_id = u.id
@@ -22,12 +22,12 @@ if ($search) {
     $params[] = $searchLike;
 }
 
-$sql .= " GROUP BY m.id, m.subject, m.body, m.has_attachments, m.sent_at, m.created_at, u.display_name
+$sql .= " GROUP BY m.id, m.subject, m.body, m.has_attachments, m.sent_at, m.created_at, u.display_name, u.username
 
     UNION
 
     SELECT m.id, m.subject, m.body, m.has_attachments, m.sent_at, m.created_at,
-            u.display_name AS sender_name, m.sent_at AS deleted_at
+            u.display_name AS sender_name, u.username AS sender_username, m.sent_at AS deleted_at
      FROM mail_messages m
      JOIN mail_users u ON m.sender_id = u.id
      WHERE m.sender_id = ? AND m.sender_deleted = 1 AND m.is_draft = 0
@@ -67,6 +67,7 @@ $messages = db_fetch_all($conn, $sql, $params);
             <tbody>
                 <?php foreach ($messages as $msg): ?>
                     <tr class="msg-row" data-msg-id="<?php echo $msg['id']; ?>"
+                        data-sender-username="<?php echo e($msg['sender_username']); ?>"
                         onclick="handleRowClick(event, <?php echo $msg['id']; ?>, 'trash')" style="cursor:pointer">
                         <td class="col-select-cell"><input type="checkbox" class="msg-select-cb" value="<?php echo $msg['id']; ?>" onclick="event.stopPropagation()"></td>
                         <td class="col-from-cell">

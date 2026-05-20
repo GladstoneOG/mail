@@ -162,6 +162,17 @@ if (!$check || $check['len'] === null) {
     if ($r2) sqlsrv_free_stmt($r2);
 } else { $msgs[] = 'reply_to_id already exists on mail_messages'; }
 
+// ── forwarded_from_id column on mail_messages ──
+$check = db_fetch_one($conn, "SELECT COL_LENGTH('mail_messages','forwarded_from_id') AS len");
+if (!$check || $check['len'] === null) {
+    $r = sqlsrv_query($conn, "ALTER TABLE mail_messages ADD forwarded_from_id INT NULL");
+    $msgs[] = $r ? 'Added forwarded_from_id column to mail_messages' : 'FAILED forwarded_from_id';
+    if ($r) sqlsrv_free_stmt($r);
+    $r2 = sqlsrv_query($conn, "CREATE INDEX IX_msg_forwarded_from ON mail_messages(forwarded_from_id)");
+    if ($r2) sqlsrv_free_stmt($r2);
+} else { $msgs[] = 'forwarded_from_id already exists on mail_messages'; }
+
+
 // ── Tags table ──
 if (!db_table_exists($conn, 'mail_tags')) {
     $sql = "CREATE TABLE mail_tags (
