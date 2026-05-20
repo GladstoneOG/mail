@@ -106,17 +106,8 @@ if ($recipRow) {
             </div>
         </div>
     </div>
-    <?php if ($replyInfo): ?>
-    <div class="reply-info-bar" onclick="window.location='index.php?page=view&id=<?php echo $replyInfo['id']; ?>&from=sent'" title="Click to view your reply" style="cursor:pointer">
-        <span class="reply-info-icon">&#x21A9;</span>
-        <span>You replied on <?php echo format_date($replyInfo['sent_at']); ?></span>
-        <span class="reply-info-arrow">&#x2192;</span>
-    </div>
-    <?php endif; ?>
-    <div class="message-body"><?php echo sanitize_html($msg['body']); ?></div>
-
     <?php if (!empty($attachments)): ?>
-        <div class="attachments-section">
+        <div class="attachments-section" style="margin-bottom:0; border-bottom:1px solid var(--border);">
             <h4>&#x1F4CE; Attachments (<?php echo count($attachments); ?>)</h4>
             <div class="attachment-list">
                 <?php foreach ($attachments as $att):
@@ -151,5 +142,13 @@ if ($recipRow) {
             </div>
         </div>
     <?php endif; ?>
+    <?php if ($replyInfo): ?>
+    <div class="reply-info-bar" onclick="window.location='index.php?page=view&id=<?php echo $replyInfo['id']; ?>&from=sent'" title="Click to view your reply" style="cursor:pointer">
+        <span class="reply-info-icon">&#x21A9;</span>
+        <span>You replied on <?php echo format_date($replyInfo['sent_at']); ?></span>
+        <span class="reply-info-arrow">&#x2192;</span>
+    </div>
+    <?php endif; ?>
+    <div class="message-body"><?php echo sanitize_html($msg['body']); ?></div>
 </div>
 <?php endif; ?>

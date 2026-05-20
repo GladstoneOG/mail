@@ -1,6 +1,7 @@
 <?php
 /**
  * Sent Messages Page - Outlook-style table with sortable column headers
+ * Shows scheduled-but-not-yet-delivered messages at the top with a different style.
  */
 $userId = auth_user_id();
 $pg = isset($_GET['pg']) ? max(1, intval($_GET['pg'])) : 1;
@@ -12,9 +13,30 @@ $dir = isset($_GET['dir']) ? $_GET['dir'] : 'desc';
 if (!in_array($sort, array('date', 'name', 'subject'))) $sort = 'date';
 if (!in_array($dir, array('asc', 'desc'))) $dir = 'desc';
 
-$countSql = "SELECT COUNT(*) FROM mail_messages WHERE sender_id = ? AND is_draft = 0 AND sender_deleted = 0";
+// Fetch scheduled (future) messages - always shown at top
+$scheduledMessages = array();
+if (!$search) {
+    $scheduledMessages = db_fetch_all($conn,
+        "SELECT m.id, m.subject, m.body, m.has_attachments, m.sent_at, m.created_at, m.scheduled_at,
+            (SELECT TOP 1 u.display_name FROM mail_recipients mr JOIN mail_users u ON mr.recipient_id = u.id WHERE mr.message_id = m.id AND mr.recipient_type = 'to' ORDER BY mr.id) as to_name
+         FROM mail_messages m
+         WHERE m.sender_id = ? AND m.is_draft = 0 AND m.sender_deleted = 0 AND m.scheduled_at IS NOT NULL AND m.sent_at > GETDATE()
+         ORDER BY m.sent_at ASC",
+        array($userId));
+    foreach ($scheduledMessages as &$smsg) {
+        if (!$smsg['to_name']) $smsg['to_name'] = 'Unknown';
+        $smsg['recip_count'] = intval(db_fetch_scalar($conn,
+            "SELECT COUNT(*) FROM mail_recipients WHERE message_id = ?", array($smsg['id'])));
+    }
+    unset($smsg);
+}
+
+// Count for pagination (exclude scheduled-future from regular list)
+$countSql = "SELECT COUNT(*) FROM mail_messages m WHERE m.sender_id = ? AND m.is_draft = 0 AND m.sender_deleted = 0 AND (m.scheduled_at IS NULL OR m.sent_at <= GETDATE())";
 $countParams = array($userId);
 
+$searchField = '';
+$searchLike = '';
 if ($search) {
     $searchField = isset($_GET['sf']) ? $_GET['sf'] : '';
     $searchLike = '%' . $search . '%';
@@ -59,10 +81,10 @@ $orderMap = array(
 $orderCol = $orderMap[$sort];
 $orderDir = strtoupper($dir);
 
-$sql = "SELECT m.id, m.subject, m.body, m.has_attachments, m.sent_at, m.created_at,
+$sql = "SELECT m.id, m.subject, m.body, m.has_attachments, m.sent_at, m.created_at, m.scheduled_at,
             (SELECT TOP 1 u.display_name FROM mail_recipients mr JOIN mail_users u ON mr.recipient_id = u.id WHERE mr.message_id = m.id AND mr.recipient_type = 'to' ORDER BY mr.id) as to_name
      FROM mail_messages m
-     WHERE m.sender_id = ? AND m.is_draft = 0 AND m.sender_deleted = 0";
+     WHERE m.sender_id = ? AND m.is_draft = 0 AND m.sender_deleted = 0 AND (m.scheduled_at IS NULL OR m.sent_at <= GETDATE())";
 $params = array($userId);
 
 if ($search) {
@@ -119,7 +141,7 @@ function sent_sort_link($col, $label, $currentSort, $currentDir) {
 }
 ?>
 
-<?php if (empty($messages)): ?>
+<?php if (empty($messages) && empty($scheduledMessages)): ?>
     <div class="empty-state">
         <div class="empty-icon">&#x1F4E4;</div>
         <h3>No sent messages</h3>
@@ -138,6 +160,40 @@ function sent_sort_link($col, $label, $currentSort, $currentDir) {
                 </tr>
             </thead>
             <tbody>
+                <?php /* Scheduled (future) messages shown first */ ?>
+                <?php foreach ($scheduledMessages as $msg): ?>
+                    <tr class="msg-row msg-scheduled"
+                        data-msg-id="<?php echo $msg['id']; ?>"
+                        onclick="handleRowClick(event, <?php echo $msg['id']; ?>, 'sent')" style="cursor:pointer">
+                        <td class="col-select-cell"><input type="checkbox" class="msg-select-cb" value="<?php echo $msg['id']; ?>" onclick="event.stopPropagation()"></td>
+                        <td class="col-from-cell">
+                            <div class="user-cell">
+                                <div class="avatar-xs-wrap">
+                                    <div class="avatar-xs" style="background:<?php echo get_avatar_color($msg['to_name']); ?>">
+                                        <?php echo e(get_initials($msg['to_name'])); ?>
+                                    </div>
+                                    <?php if ($msg['recip_count'] > 1): ?>
+                                        <span class="avatar-badge">+<?php echo $msg['recip_count'] - 1; ?></span>
+                                    <?php endif; ?>
+                                </div>
+                                <span class="recip-name"><?php echo e($msg['to_name']); ?></span>
+                                <?php if ($msg['recip_count'] > 1): ?>
+                                    <span class="recip-extra">+<?php echo $msg['recip_count'] - 1; ?></span>
+                                <?php endif; ?>
+                            </div>
+                        </td>
+                        <td class="col-subject-cell">
+                            <span class="msg-scheduled-badge">&#x1F552; Scheduled</span>
+                            <span class="msg-subj-text"><?php echo e($msg['subject']); ?></span>
+                            <span class="msg-preview-inline"> &mdash; <?php echo e(truncate_text($msg['body'], 40)); ?></span>
+                        </td>
+                        <td class="col-attach-cell"><?php echo $msg['has_attachments'] ? '&#x1F4CE;' : ''; ?></td>
+                        <td class="col-date-cell">
+                            <span class="msg-scheduled-time"><?php echo format_date($msg['sent_at']); ?></span>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                <?php /* Regular sent messages */ ?>
                 <?php foreach ($messages as $msg): ?>
                     <tr class="msg-row"
                         data-msg-id="<?php echo $msg['id']; ?>"

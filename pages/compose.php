@@ -1,6 +1,6 @@
 <?php
 /**
- * Compose Message - with Address Book Modal + Rich Text Editor
+ * Compose Message - with Address Book Modal + Quill Rich Text Editor + Inline Schedule
  */
 $userId = auth_user_id();
 $replyId = isset($_GET['reply']) ? intval($_GET['reply']) : 0;
@@ -78,6 +78,10 @@ if (isset($_GET['to'])) $prefillTo = $_GET['to'];
 $allUsers = db_fetch_all($conn, "SELECT id, username, display_name FROM mail_users WHERE id != ? AND is_active = 1 ORDER BY display_name", array($userId));
 ?>
 
+<!-- Quill.js CDN -->
+<link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+
 <!-- Address Book Modal (#1) -->
 <div class="modal-overlay" id="ab-modal" style="display:none" onclick="if(event.target===this)closeAddressBook()">
     <div class="modal" style="max-width:560px">
@@ -117,7 +121,6 @@ $allUsers = db_fetch_all($conn, "SELECT id, username, display_name FROM mail_use
             <button type="button" class="btn btn-sm btn-primary" onclick="addCheckedAs('to')">Add as To</button>
             <button type="button" class="btn btn-sm btn-secondary" onclick="addCheckedAs('cc')">Add as CC</button>
             <button type="button" class="btn btn-sm btn-secondary" onclick="addCheckedAs('bcc')">Add as BCC</button>
-            <!-- <button type="button" class="btn btn-sm btn-ghost" onclick="closeAddressBook()" style="margin-left:auto">Done</button> -->
         </div>
     </div>
 </div>
@@ -157,29 +160,8 @@ $allUsers = db_fetch_all($conn, "SELECT id, username, display_name FROM mail_use
     </div>
     <div class="form-group">
         <label>Message</label>
-        <!-- Rich Text Editor Toolbar (#6 improved) -->
-        <div class="editor-toolbar" id="editor-toolbar">
-            <button type="button" id="tb-bold" onclick="execCmd('bold')" title="Bold (Ctrl+B)" class="tb-btn"><b>B</b></button>
-            <button type="button" id="tb-italic" onclick="execCmd('italic')" title="Italic (Ctrl+I)" class="tb-btn"><i>I</i></button>
-            <button type="button" id="tb-underline" onclick="execCmd('underline')" title="Underline (Ctrl+U)" class="tb-btn"><u>U</u></button>
-            <span class="toolbar-sep"></span>
-            <select onchange="execCmd('fontSize',this.value);this.selectedIndex=0" title="Font Size">
-                <option value="">Size</option>
-                <option value="1">Small</option>
-                <option value="3">Normal</option>
-                <option value="5">Large</option>
-                <option value="7">Huge</option>
-            </select>
-            <input type="color" value="#e2e8f0" onchange="execCmd('foreColor',this.value)" title="Text Color" class="color-pick">
-            <span class="toolbar-sep"></span>
-            <button type="button" id="tb-justifyLeft" onclick="execCmd('justifyLeft')" title="Align Left" class="tb-btn tb-active">&#x2190;</button>
-            <button type="button" id="tb-justifyCenter" onclick="execCmd('justifyCenter')" title="Center" class="tb-btn">&#x2194;</button>
-            <button type="button" id="tb-justifyRight" onclick="execCmd('justifyRight')" title="Align Right" class="tb-btn">&#x2192;</button>
-            <span class="toolbar-sep"></span>
-            <button type="button" id="tb-insertUnorderedList" onclick="execCmd('insertUnorderedList')" title="Bullet List" class="tb-btn">&#x2022;</button>
-            <button type="button" id="tb-insertOrderedList" onclick="execCmd('insertOrderedList')" title="Numbered List" class="tb-btn">1.</button>
-        </div>
-        <div id="editor" class="rich-editor" contenteditable="true"><?php echo $prefillBody; ?></div>
+        <!-- Quill Rich Text Editor -->
+        <div id="quill-editor" style="min-height:220px;"><?php echo $prefillBody; ?></div>
         <input type="hidden" name="body" id="body-hidden">
     </div>
     <div class="form-group">
@@ -201,34 +183,50 @@ $allUsers = db_fetch_all($conn, "SELECT id, username, display_name FROM mail_use
         </div>
         <div id="file-list" class="file-list"></div>
     </div>
+
+    <input type="hidden" name="scheduled_at" id="scheduled-at-input" value="">
+
     <div class="compose-actions">
-        <div class="schedule-send-wrap">
+        <div class="schedule-send-wrap" id="schedule-wrap">
             <button type="submit" class="btn btn-primary" id="send-btn"><span>&#x1F4E8;</span> Send Message</button>
-            <button type="button" class="schedule-dropdown-toggle" onclick="toggleScheduleDropdown()" title="Schedule Send">&#x25B2;</button>
+            <button type="button" class="schedule-dropdown-toggle" id="schedule-toggle-btn" onclick="toggleScheduleDropdown()" title="Schedule Send">&#x25B2;</button>
             <div class="schedule-dropdown" id="schedule-dropdown">
                 <div class="schedule-header">&#x1F552; Schedule Send</div>
                 <div class="schedule-presets">
-                    <button type="button" class="schedule-preset" onclick="scheduleSendPreset('today_evening')">
-                        <span class="schedule-preset-icon">&#x1F307;</span> Later today <span style="margin-left:auto;color:var(--text3);font-size:11px" id="schedule-today-hint"></span>
-                    </button>
-                    <button type="button" class="schedule-preset" onclick="scheduleSendPreset('tomorrow_morning')">
-                        <span class="schedule-preset-icon">&#x2600;&#xFE0F;</span> Tomorrow morning <span style="margin-left:auto;color:var(--text3);font-size:11px">8:00 AM</span>
-                    </button>
-                    <button type="button" class="schedule-preset" onclick="scheduleSendPreset('next_monday')">
-                        <span class="schedule-preset-icon">&#x1F4C5;</span> Next Monday <span style="margin-left:auto;color:var(--text3);font-size:11px">8:00 AM</span>
-                    </button>
+                    <label class="schedule-preset">
+                        <input type="radio" name="schedule_choice" value="now" checked onchange="onScheduleChange()">
+                        <span class="schedule-preset-icon">&#x1F4E8;</span>
+                        <span class="schedule-preset-label">Send now</span>
+                    </label>
+                    <label class="schedule-preset">
+                        <input type="radio" name="schedule_choice" value="today_evening" onchange="onScheduleChange()">
+                        <span class="schedule-preset-icon">&#x1F307;</span>
+                        <span class="schedule-preset-label">Later today <small id="schedule-today-time"></small></span>
+                    </label>
+                    <label class="schedule-preset">
+                        <input type="radio" name="schedule_choice" value="tomorrow_morning" onchange="onScheduleChange()">
+                        <span class="schedule-preset-icon">&#x2600;&#xFE0F;</span>
+                        <span class="schedule-preset-label">Tomorrow morning <small>8:00 AM</small></span>
+                    </label>
+                    <label class="schedule-preset">
+                        <input type="radio" name="schedule_choice" value="next_monday" onchange="onScheduleChange()">
+                        <span class="schedule-preset-icon">&#x1F4C5;</span>
+                        <span class="schedule-preset-label">Next Monday <small>8:00 AM</small></span>
+                    </label>
+                    <label class="schedule-preset">
+                        <input type="radio" name="schedule_choice" value="custom" onchange="onScheduleChange()">
+                        <span class="schedule-preset-icon">&#x1F4DD;</span>
+                        <span class="schedule-preset-label">Custom date & time</span>
+                    </label>
                 </div>
-                <div class="schedule-custom">
-                    <label>Custom date & time</label>
+                <div class="schedule-custom" id="schedule-custom-fields" style="display:none;">
                     <div class="schedule-custom-row">
                         <input type="date" id="schedule-date">
                         <input type="time" id="schedule-time" value="08:00">
                     </div>
-                    <button type="button" class="btn btn-primary btn-sm" style="width:100%" onclick="scheduleSendCustom()">&#x1F4E8; Schedule Send</button>
                 </div>
             </div>
         </div>
-        <input type="hidden" name="scheduled_at" id="scheduled-at-input" value="">
         <button type="button" class="btn btn-secondary" id="draft-btn" onclick="saveDraft()"><span>&#x1F4DD;</span> Save Draft</button>
         <button type="button" class="btn btn-ghost" onclick="customConfirm('Discard message?', function() { window.hasUnsavedChanges = false; window.location='index.php?page=inbox'; })">Discard</button>
     </div>
@@ -292,59 +290,31 @@ function abRowClick(row, event) {
     }
 }
 
-// Rich text editor with toggle state tracking (#6)
-function execCmd(cmd, val) {
-    var editor = document.getElementById('editor');
-    // Must focus editor BEFORE execCommand for first-click to work
-    editor.focus();
-    document.execCommand(cmd, false, val || null);
-    updateToolbarState();
-}
+// ── Quill Rich Text Editor ──
+var quill = new Quill('#quill-editor', {
+    theme: 'snow',
+    placeholder: 'Write your message...',
+    modules: {
+        toolbar: [
+            ['bold', 'italic', 'underline', 'strike'],
+            [{ 'color': [] }, { 'background': [] }],
+            [{ 'size': ['small', false, 'large', 'huge'] }],
+            [{ 'align': [] }],
+            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+            [{ 'indent': '-1'}, { 'indent': '+1' }],
+            ['blockquote', 'code-block'],
+            ['link'],
+            ['clean']
+        ]
+    }
+});
 
-function updateToolbarState() {
-    var toggleCmds = ['bold', 'italic', 'underline'];
-    for (var i = 0; i < toggleCmds.length; i++) {
-        var btn = document.getElementById('tb-' + toggleCmds[i]);
-        if (btn) {
-            if (document.queryCommandState(toggleCmds[i])) {
-                btn.classList.add('tb-active');
-            } else {
-                btn.classList.remove('tb-active');
-            }
-        }
+// Sync Quill content to hidden field
+function syncEditorContent() {
+    var hidden = document.getElementById('body-hidden');
+    if (hidden && quill) {
+        hidden.value = quill.root.innerHTML;
     }
-    // Alignment
-    var aligns = ['justifyLeft', 'justifyCenter', 'justifyRight'];
-    for (var j = 0; j < aligns.length; j++) {
-        var abtn = document.getElementById('tb-' + aligns[j]);
-        if (abtn) {
-            if (document.queryCommandState(aligns[j])) {
-                abtn.classList.add('tb-active');
-            } else {
-                abtn.classList.remove('tb-active');
-            }
-        }
-    }
-    // Lists
-    var lists = ['insertUnorderedList', 'insertOrderedList'];
-    for (var k = 0; k < lists.length; k++) {
-        var lbtn = document.getElementById('tb-' + lists[k]);
-        if (lbtn) {
-            if (document.queryCommandState(lists[k])) {
-                lbtn.classList.add('tb-active');
-            } else {
-                lbtn.classList.remove('tb-active');
-            }
-        }
-    }
-}
-
-// Track selection changes to update toolbar state
-var editor = document.getElementById('editor');
-if (editor) {
-    editor.addEventListener('keyup', function(e) { updateToolbarState(); checkEmptyForm(); });
-    editor.addEventListener('mouseup', updateToolbarState);
-    editor.addEventListener('focus', updateToolbarState);
 }
 
 // Item 4: Disable Send/Draft buttons if completely clean
@@ -353,18 +323,22 @@ function checkEmptyForm() {
     var cc = document.getElementById('cc').value.trim();
     var bcc = document.getElementById('bcc').value.trim();
     var subj = document.getElementById('subject').value.trim();
-    var body = editor ? editor.textContent.trim() : '';
+    var body = quill ? quill.getText().trim() : '';
     var hasFiles = (window.composeFiles && window.composeFiles.length > 0);
     var isEmpty = (!to && !cc && !bcc && !subj && !body && !hasFiles);
 
     var sendBtn = document.getElementById('send-btn');
     var draftBtn = document.getElementById('draft-btn');
-    var schedBtn = document.getElementById('schedule-send-toggle');
     if (sendBtn) sendBtn.classList.toggle('btn-disabled', isEmpty);
     if (draftBtn) draftBtn.classList.toggle('btn-disabled', isEmpty);
-    if (schedBtn) schedBtn.classList.toggle('btn-disabled', isEmpty);
     return isEmpty;
 }
+
+// Track Quill changes
+quill.on('text-change', function() {
+    window.hasUnsavedChanges = true;
+    checkEmptyForm();
+});
 
 // Attach listeners to fields for checkEmptyForm
 var fields = ['to', 'cc', 'bcc', 'subject'];
@@ -385,23 +359,20 @@ if (toField) {
     toField.value = val;
 }
 
-// ── Schedule Send ──
+// ── Schedule Send (split-button dropdown) ──
 function toggleScheduleDropdown() {
-    if (typeof checkEmptyForm === 'function' && checkEmptyForm()) {
-        showToast('Please enter at least a recipient, subject, or message', 'error');
-        return;
-    }
     var dd = document.getElementById('schedule-dropdown');
     var isOpen = dd.classList.contains('show');
-    dd.classList.toggle('show', !isOpen);
-    if (!isOpen) {
+    if (isOpen) {
+        dd.classList.remove('show');
+    } else {
         // Set today hint
         var now = new Date();
-        var hint = document.getElementById('schedule-today-hint');
+        var hint = document.getElementById('schedule-today-time');
         if (hint) {
             var evening = new Date(now); evening.setHours(18, 0, 0, 0);
             if (now.getHours() >= 18) evening.setDate(evening.getDate() + 1);
-            hint.textContent = evening.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+            hint.textContent = '(' + evening.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'}) + ')';
         }
         // Set min date for custom picker
         var dateInput = document.getElementById('schedule-date');
@@ -410,37 +381,83 @@ function toggleScheduleDropdown() {
             dateInput.min = y + '-' + m + '-' + d;
             if (!dateInput.value) dateInput.value = y + '-' + m + '-' + d;
         }
+        dd.classList.add('show');
+        // Close on outside click
+        setTimeout(function() {
+            document.addEventListener('click', closeScheduleOnOutside);
+        }, 10);
     }
 }
 
-function scheduleSendPreset(preset) {
+function closeScheduleOnOutside(e) {
+    var wrap = document.getElementById('schedule-wrap');
+    if (wrap && !wrap.contains(e.target)) {
+        document.getElementById('schedule-dropdown').classList.remove('show');
+        document.removeEventListener('click', closeScheduleOnOutside);
+    }
+}
+
+function onScheduleChange() {
+    var choice = document.querySelector('input[name="schedule_choice"]:checked');
+    if (!choice) return;
+    var val = choice.value;
+    var btn = document.getElementById('send-btn');
+    var customFields = document.getElementById('schedule-custom-fields');
+
+    if (val === 'now') {
+        document.getElementById('scheduled-at-input').value = '';
+        btn.innerHTML = '<span>&#x1F4E8;</span> Send Message';
+        customFields.style.display = 'none';
+        document.getElementById('schedule-dropdown').classList.remove('show');
+        document.removeEventListener('click', closeScheduleOnOutside);
+        return;
+    }
+
+    customFields.style.display = val === 'custom' ? 'block' : 'none';
+
     var now = new Date();
     var target;
-    if (preset === 'today_evening') {
+
+    if (val === 'today_evening') {
         target = new Date(now); target.setHours(18, 0, 0, 0);
         if (now.getHours() >= 18) target.setDate(target.getDate() + 1);
-    } else if (preset === 'tomorrow_morning') {
+    } else if (val === 'tomorrow_morning') {
         target = new Date(now); target.setDate(target.getDate() + 1); target.setHours(8, 0, 0, 0);
-    } else if (preset === 'next_monday') {
+    } else if (val === 'next_monday') {
         target = new Date(now);
         var daysUntilMon = (8 - target.getDay()) % 7;
         if (daysUntilMon === 0) daysUntilMon = 7;
         target.setDate(target.getDate() + daysUntilMon);
         target.setHours(8, 0, 0, 0);
+    } else if (val === 'custom') {
+        updateCustomSchedule();
+        return;
     }
-    if (target) doScheduleSend(target);
+
+    if (target) {
+        setScheduleTarget(target);
+        // Close dropdown after selection (not for custom)
+        document.getElementById('schedule-dropdown').classList.remove('show');
+        document.removeEventListener('click', closeScheduleOnOutside);
+    }
 }
 
-function scheduleSendCustom() {
+function updateCustomSchedule() {
     var dateVal = document.getElementById('schedule-date').value;
     var timeVal = document.getElementById('schedule-time').value;
-    if (!dateVal || !timeVal) { showToast('Please select date and time', 'error'); return; }
+    if (!dateVal || !timeVal) {
+        document.getElementById('scheduled-at-input').value = '';
+        var btn = document.getElementById('send-btn');
+        btn.innerHTML = '<span>&#x1F552;</span> Schedule Send';
+        return;
+    }
     var target = new Date(dateVal + 'T' + timeVal);
-    if (target <= new Date()) { showToast('Scheduled time must be in the future', 'error'); return; }
-    doScheduleSend(target);
+    // Don't show error toast during editing — just set the target silently.
+    // Validation will happen at send time.
+    setScheduleTarget(target);
 }
 
-function doScheduleSend(target) {
+function setScheduleTarget(target) {
     var y = target.getFullYear();
     var m = String(target.getMonth() + 1).padStart(2, '0');
     var d = String(target.getDate()).padStart(2, '0');
@@ -448,18 +465,20 @@ function doScheduleSend(target) {
     var min = String(target.getMinutes()).padStart(2, '0');
     var formatted = y + '-' + m + '-' + d + ' ' + h + ':' + min + ':00';
     document.getElementById('scheduled-at-input').value = formatted;
-    document.getElementById('schedule-dropdown').classList.remove('show');
-    // Update send button text
+
     var btn = document.getElementById('send-btn');
-    btn.innerHTML = '<span>&#x1F552;</span> Scheduled: ' + target.toLocaleDateString('en-US', {month:'short', day:'numeric'}) + ' ' + target.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
-    showToast('Email will be sent ' + target.toLocaleDateString() + ' at ' + target.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'}), 'info');
+    btn.innerHTML = '<span>&#x1F552;</span> Schedule: ' + target.toLocaleDateString('en-US', {month:'short', day:'numeric'}) + ' ' + target.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
 }
 
-// Close schedule dropdown on outside click
-document.addEventListener('click', function(e) {
-    var wrap = document.querySelector('.schedule-send-wrap');
-    var dd = document.getElementById('schedule-dropdown');
-    if (dd && wrap && !wrap.contains(e.target)) dd.classList.remove('show');
+// Listen for custom date/time changes
+var schedDate = document.getElementById('schedule-date');
+var schedTime = document.getElementById('schedule-time');
+if (schedDate) schedDate.addEventListener('change', function() {
+    var radio = document.querySelector('input[name="schedule_choice"][value="custom"]');
+    if (radio && radio.checked) updateCustomSchedule();
+});
+if (schedTime) schedTime.addEventListener('change', function() {
+    var radio = document.querySelector('input[name="schedule_choice"][value="custom"]');
+    if (radio && radio.checked) updateCustomSchedule();
 });
 </script>
-

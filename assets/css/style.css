@@ -3864,126 +3864,139 @@ body.trash-mode .message-item:hover {
     background: rgba(239, 68, 68, .1)
 }
 
-/* ===== SCHEDULE SEND DROPDOWN ===== */
+/* ===== SCHEDULE SEND SPLIT BUTTON + DROPDOWN ===== */
 .schedule-send-wrap {
     position: relative;
-    display: inline-flex
+    display: inline-flex;
 }
 
 .schedule-send-wrap .btn-primary {
-    border-radius: var(--radius-sm) 0 0 var(--radius-sm)
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
 }
 
 .schedule-dropdown-toggle {
-    padding: 10px 8px;
+    padding: 10px 10px;
     background: linear-gradient(135deg, #5b52e0, #7c3aed);
     color: #fff;
     border: none;
     border-left: 1px solid rgba(255,255,255,.15);
     border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 11px;
     transition: all .2s;
     display: flex;
-    align-items: center
+    align-items: center;
 }
 
 .schedule-dropdown-toggle:hover {
-    background: linear-gradient(135deg, #7c3aed, #5b52e0)
+    background: linear-gradient(135deg, #7c3aed, #5b52e0);
 }
 
 .schedule-dropdown {
     position: absolute;
     bottom: 100%;
-    right: 0;
+    left: 0;
     background: var(--bg3);
     border: 1px solid var(--border);
     border-radius: 10px;
     box-shadow: 0 8px 32px rgba(0,0,0,.4);
     min-width: 280px;
-    padding: 12px;
+    padding: 10px;
     display: none;
     animation: ctxFadeIn .15s ease;
-    margin-bottom: 6px
+    margin-bottom: 6px;
 }
 
 .schedule-dropdown.show {
-    display: block
+    display: block;
 }
 
 .schedule-header {
     font-size: 13px;
     font-weight: 700;
     color: var(--text);
-    margin-bottom: 10px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
-    gap: 6px
+    gap: 6px;
 }
 
 .schedule-presets {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    margin-bottom: 12px
+    gap: 2px;
 }
 
 .schedule-preset {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 10px;
+    padding: 7px 8px;
     border-radius: 6px;
     cursor: pointer;
     font-size: 13px;
     color: var(--text2);
     transition: all .12s;
-    border: none;
-    background: none;
-    width: 100%;
-    text-align: left
+    margin: 0;
+    line-height: 1.2;
 }
 
 .schedule-preset:hover {
     background: var(--accent-glow);
-    color: var(--accent2)
+    color: var(--accent2);
+}
+
+.schedule-preset input[type="radio"] {
+    accent-color: var(--accent);
+    margin: 0;
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
 }
 
 .schedule-preset-icon {
-    font-size: 14px
+    font-size: 14px;
+    width: 18px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.schedule-preset-label {
+    flex: 1;
+    white-space: nowrap;
+}
+
+.schedule-preset-label small {
+    color: var(--text3);
+    font-weight: 400;
 }
 
 .schedule-custom {
     border-top: 1px solid var(--border);
-    padding-top: 10px
-}
-
-.schedule-custom label {
-    font-size: 12px;
-    color: var(--text3);
-    margin-bottom: 4px;
-    display: block
+    padding-top: 8px;
+    margin-top: 4px;
 }
 
 .schedule-custom-row {
     display: flex;
     gap: 6px;
-    margin-bottom: 8px
 }
 
 .schedule-custom-row input {
     flex: 1;
-    padding: 8px 10px;
+    padding: 7px 8px;
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 6px;
     color: var(--text);
-    font-size: 13px
+    font-size: 12px;
 }
 
 .schedule-custom-row input:focus {
     outline: none;
-    border-color: var(--accent)
+    border-color: var(--accent);
 }
 
 /* Light mode for new components */
@@ -3992,7 +4005,9 @@ body.trash-mode .message-item:hover {
 }
 
 [data-theme="light"] .schedule-dropdown {
-    box-shadow: 0 8px 32px rgba(0,0,0,.12)
+    background: #fff;
+    border-color: #e5e7eb;
+    box-shadow: 0 8px 32px rgba(0,0,0,.12);
 }
 
 /* ===== ADVANCED SEARCH ===== */
@@ -4186,3 +4201,159 @@ body.trash-mode .message-item:hover {
 .btn-disabled {
     opacity: 0.5;
 }
+
+/* ===== QUILL EDITOR DARK THEME OVERRIDES ===== */
+.ql-toolbar.ql-snow {
+    background: var(--bg2);
+    border-color: var(--border) !important;
+    border-radius: 8px 8px 0 0;
+}
+
+.ql-container.ql-snow {
+    border-color: var(--border) !important;
+    border-radius: 0 0 8px 8px;
+    font-size: 14px;
+    font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.ql-editor {
+    color: var(--text);
+    background: var(--bg);
+    min-height: 200px;
+}
+
+.ql-editor.ql-blank::before {
+    color: var(--text3) !important;
+    font-style: normal !important;
+}
+
+.ql-snow .ql-stroke {
+    stroke: var(--text2) !important;
+}
+
+.ql-snow .ql-fill {
+    fill: var(--text2) !important;
+}
+
+.ql-snow .ql-picker-label {
+    color: var(--text2) !important;
+}
+
+.ql-snow .ql-picker-options {
+    background: var(--bg3) !important;
+    border-color: var(--border) !important;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.4);
+}
+
+.ql-snow .ql-picker-item {
+    color: var(--text) !important;
+}
+
+.ql-snow .ql-picker-item:hover {
+    background: var(--accent-glow);
+    color: var(--accent2) !important;
+}
+
+.ql-snow .ql-active .ql-stroke {
+    stroke: var(--accent2) !important;
+}
+
+.ql-snow .ql-active .ql-fill {
+    fill: var(--accent2) !important;
+}
+
+.ql-snow .ql-active {
+    color: var(--accent2) !important;
+}
+
+.ql-snow button.ql-active,
+.ql-snow .ql-picker-label.ql-active {
+    background: rgba(99, 102, 241, .15) !important;
+    border-radius: 4px;
+}
+
+.ql-toolbar button:hover .ql-stroke {
+    stroke: var(--accent2) !important;
+}
+
+.ql-toolbar button:hover .ql-fill {
+    fill: var(--accent2) !important;
+}
+
+.ql-snow .ql-tooltip {
+    background: var(--bg3) !important;
+    border-color: var(--border) !important;
+    color: var(--text) !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,.3);
+    border-radius: 8px;
+}
+
+.ql-snow .ql-tooltip input[type="text"] {
+    background: var(--bg) !important;
+    border-color: var(--border) !important;
+    color: var(--text) !important;
+}
+
+/* Light mode - Quill */
+[data-theme="light"] .ql-toolbar.ql-snow {
+    background: #f8f9fa;
+}
+
+[data-theme="light"] .ql-editor {
+    background: #fff;
+}
+
+[data-theme="light"] .ql-snow .ql-stroke {
+    stroke: #64748b !important;
+}
+
+[data-theme="light"] .ql-snow .ql-fill {
+    fill: #64748b !important;
+}
+
+[data-theme="light"] .ql-snow .ql-picker-options {
+    background: #fff !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,.12);
+}
+
+/* ===== SCHEDULED MESSAGE ROW STYLES ===== */
+.msg-row.msg-scheduled {
+    background: linear-gradient(135deg, rgba(251, 191, 36, .06), rgba(245, 158, 11, .03));
+    border-left: 3px solid #f59e0b;
+}
+
+.msg-row.msg-scheduled:hover {
+    background: linear-gradient(135deg, rgba(251, 191, 36, .12), rgba(245, 158, 11, .06));
+}
+
+.msg-scheduled-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .3px;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #fff;
+    margin-right: 6px;
+    white-space: nowrap;
+    vertical-align: middle;
+    text-transform: uppercase;
+}
+
+.msg-scheduled-time {
+    font-size: 11px;
+    color: #f59e0b;
+    font-weight: 600;
+}
+
+[data-theme="light"] .msg-row.msg-scheduled {
+    background: linear-gradient(135deg, rgba(251, 191, 36, .08), rgba(245, 158, 11, .04));
+}
+
+[data-theme="light"] .msg-row.msg-scheduled:hover {
+    background: linear-gradient(135deg, rgba(251, 191, 36, .15), rgba(245, 158, 11, .08));
+}

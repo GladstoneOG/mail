@@ -245,6 +245,28 @@ if (!$check || $check['len'] === null) {
     if ($r) sqlsrv_free_stmt($r);
 } else { $msgs[] = 'email_footer already exists on mail_users'; }
 
+// ── Remember Me tokens table ──
+if (!db_table_exists($conn, 'mail_remember_tokens')) {
+    $sql = "CREATE TABLE mail_remember_tokens (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        user_id INT NOT NULL,
+        token_hash NVARCHAR(255) NOT NULL,
+        expires_at DATETIME NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_remember_user FOREIGN KEY (user_id) REFERENCES mail_users(id) ON DELETE CASCADE
+    )";
+    $r = sqlsrv_query($conn, $sql);
+    $msgs[] = $r ? 'Created table: mail_remember_tokens' : 'FAILED mail_remember_tokens: ' . print_r(sqlsrv_errors(), true);
+    if ($r) sqlsrv_free_stmt($r);
+    $idxs = array(
+        "CREATE INDEX IX_remember_user ON mail_remember_tokens(user_id)",
+        "CREATE INDEX IX_remember_token ON mail_remember_tokens(token_hash)",
+        "CREATE INDEX IX_remember_expires ON mail_remember_tokens(expires_at)"
+    );
+    foreach ($idxs as $ix) { $r = sqlsrv_query($conn, $ix); if ($r) sqlsrv_free_stmt($r); }
+    $msgs[] = 'Created indexes for mail_remember_tokens';
+} else { $msgs[] = 'mail_remember_tokens already exists'; }
+
 echo '<pre>Migration results: ' . implode("\n", $msgs) . '</pre>';
 echo '<a href="index.php">Go to app</a>';
 

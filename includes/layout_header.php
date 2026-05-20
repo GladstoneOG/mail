@@ -9,7 +9,7 @@ $_recentUnread = db_fetch_all($conn,
      FROM mail_recipients mr
      JOIN mail_messages m ON mr.message_id = m.id
      JOIN mail_users u ON m.sender_id = u.id
-     WHERE mr.recipient_id = ? AND mr.is_read = 0 AND mr.is_deleted = 0 AND m.is_draft = 0
+     WHERE mr.recipient_id = ? AND mr.is_read = 0 AND mr.is_deleted = 0 AND m.is_draft = 0 AND (m.sent_at IS NULL OR m.sent_at <= GETDATE())
      ORDER BY m.sent_at DESC
      OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY",
     array(auth_user_id()));

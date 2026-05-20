@@ -6,8 +6,9 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = isset($_POST['username']) ? trim($_POST['username']) : '';
     $password = isset($_POST['password']) ? $_POST['password'] : '';
+    $rememberMe = isset($_POST['remember_me']) && $_POST['remember_me'] === '1';
     if ($username && $password) {
-        if (auth_login($conn, $username, $password)) {
+        if (auth_login($conn, $username, $password, $rememberMe)) {
             redirect('index.php?page=inbox');
         } else {
             $error = 'Invalid username or password.';
@@ -51,6 +52,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <label for="password">Password</label>
                     <input type="password" id="password" name="password" required
                            placeholder="Enter your password">
+                </div>
+                <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-top:-4px;">
+                    <input type="checkbox" id="remember_me" name="remember_me" value="1" style="width:auto;margin:0;accent-color:var(--accent);">
+                    <label for="remember_me" style="margin:0;font-size:13px;color:var(--text2);cursor:pointer;user-select:none;">Remember me for 30 days</label>
                 </div>
                 <button type="submit" class="btn btn-primary btn-block">Sign In</button>
             </form>

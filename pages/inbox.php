@@ -15,7 +15,7 @@ if (!in_array($dir, array('asc', 'desc'))) $dir = 'desc';
 
 $countSql = "SELECT COUNT(DISTINCT m.id) FROM mail_recipients mr
              JOIN mail_messages m ON mr.message_id = m.id
-             WHERE mr.recipient_id = ? AND mr.is_deleted = 0 AND m.is_draft = 0 AND (mr.folder_id IS NULL)";
+             WHERE mr.recipient_id = ? AND mr.is_deleted = 0 AND m.is_draft = 0 AND (mr.folder_id IS NULL) AND (m.sent_at IS NULL OR m.sent_at <= GETDATE())";
 $countParams = array($userId);
 
 $sql = "SELECT m.id, m.subject, m.body, m.has_attachments, m.created_at, m.sent_at,
@@ -24,7 +24,7 @@ $sql = "SELECT m.id, m.subject, m.body, m.has_attachments, m.created_at, m.sent_
         FROM mail_recipients mr
         JOIN mail_messages m ON mr.message_id = m.id
         JOIN mail_users u ON m.sender_id = u.id
-        WHERE mr.recipient_id = ? AND mr.is_deleted = 0 AND m.is_draft = 0 AND (mr.folder_id IS NULL)";
+        WHERE mr.recipient_id = ? AND mr.is_deleted = 0 AND m.is_draft = 0 AND (mr.folder_id IS NULL) AND (m.sent_at IS NULL OR m.sent_at <= GETDATE())";
 $params = array($userId);
 
 if ($search) {

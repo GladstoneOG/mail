@@ -289,10 +289,14 @@ window.closePreviewModal = function() {
 })();
 
 function syncEditorContent() {
-    var editor = document.getElementById('editor');
     var hidden = document.getElementById('body-hidden');
-    if (editor && hidden) {
-        hidden.value = editor.innerHTML;
+    if (!hidden) return;
+    // Use Quill if available (compose page), otherwise fall back to contenteditable
+    if (typeof quill !== 'undefined' && quill) {
+        hidden.value = quill.root.innerHTML;
+    } else {
+        var editor = document.getElementById('editor');
+        if (editor) hidden.value = editor.innerHTML;
     }
 }
 
@@ -303,6 +307,18 @@ function sendMessage(isDraft) {
     if (typeof checkEmptyForm === 'function' && checkEmptyForm()) {
         showToast('Please enter at least a recipient, subject, or message', 'error');
         return;
+    }
+
+    // Validate scheduled time is in the future (only at send time)
+    if (!isDraft) {
+        var scheduledVal = document.getElementById('scheduled-at-input');
+        if (scheduledVal && scheduledVal.value) {
+            var scheduledDate = new Date(scheduledVal.value.replace(' ', 'T'));
+            if (scheduledDate <= new Date()) {
+                showToast('Scheduled time must be in the future', 'error');
+                return;
+            }
+        }
     }
 
     syncEditorContent();
@@ -334,7 +350,8 @@ function sendMessage(isDraft) {
                 showToast(data.error, 'error');
                 if (btn) { btn.disabled = false; btn.textContent = isDraft ? '📝 Save Draft' : '📨 Send Message'; }
             } else {
-                showToast(isDraft ? 'Draft saved!' : 'Message sent!', 'success');
+                var msg = isDraft ? 'Draft saved!' : (data.scheduled ? 'Message scheduled!' : 'Message sent!');
+                showToast(msg, 'success');
                 setTimeout(function () {
                     window.location = 'index.php?page=' + (isDraft ? 'drafts' : 'sent');
                 }, 800);

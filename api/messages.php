@@ -50,9 +50,22 @@ case 'send':
     if ($forwardAttachments) $hasAttachments = 1;
 
     $isScheduled = (!$isDraft && $scheduledAt) ? true : false;
+    // When scheduled, set sent_at to the scheduled time so the message
+    // won't appear in recipients' inboxes until that time.
+    if ($isDraft) {
+        $sentAtClause = "NULL";
+    } elseif ($isScheduled) {
+        $sentAtClause = "?";
+    } else {
+        $sentAtClause = "GETDATE()";
+    }
     $sql = "INSERT INTO mail_messages (sender_id, subject, body, is_draft, has_attachments, sender_deleted, reply_to_id, scheduled_at, created_at, sent_at)
-            VALUES (?, ?, ?, ?, ?, 0, ?, ?, GETDATE(), " . ($isDraft ? "NULL" : "GETDATE()") . ")";
-    $msgId = db_insert_get_id($conn, $sql, array($userId, $subject, $body, $isDraft, $hasAttachments, $replyToId > 0 ? $replyToId : null, $isScheduled ? $scheduledAt : null));
+            VALUES (?, ?, ?, ?, ?, 0, ?, ?, GETDATE(), " . $sentAtClause . ")";
+    $params_insert = array($userId, $subject, $body, $isDraft, $hasAttachments, $replyToId > 0 ? $replyToId : null, $isScheduled ? $scheduledAt : null);
+    if ($isScheduled) {
+        $params_insert[] = $scheduledAt;
+    }
+    $msgId = db_insert_get_id($conn, $sql, $params_insert);
     if (!$msgId) json_response(array('error' => 'Failed to create message'), 500);
 
     // Insert recipients
@@ -158,7 +171,7 @@ case 'check_new':
     $count = get_unread_count($conn, $userId);
     $latestSubj = '';
     if ($count > 0) {
-        $latestMsg = db_fetch_one($conn, "SELECT m.subject FROM mail_recipients mr JOIN mail_messages m ON mr.message_id = m.id WHERE mr.recipient_id = ? AND mr.is_read = 0 AND mr.is_deleted = 0 AND m.is_draft = 0 ORDER BY m.sent_at DESC", array($userId));
+        $latestMsg = db_fetch_one($conn, "SELECT m.subject FROM mail_recipients mr JOIN mail_messages m ON mr.message_id = m.id WHERE mr.recipient_id = ? AND mr.is_read = 0 AND mr.is_deleted = 0 AND m.is_draft = 0 AND (m.sent_at IS NULL OR m.sent_at <= GETDATE()) ORDER BY m.sent_at DESC", array($userId));
         if ($latestMsg) $latestSubj = $latestMsg['subject'];
     }
     json_response(array('unread' => $count, 'latest_subject' => $latestSubj));
@@ -171,7 +184,7 @@ case 'notif_list':
          FROM mail_recipients mr
          JOIN mail_messages m ON mr.message_id = m.id
          JOIN mail_users u ON m.sender_id = u.id
-         WHERE mr.recipient_id = ? AND mr.is_read = 0 AND mr.is_deleted = 0 AND m.is_draft = 0
+         WHERE mr.recipient_id = ? AND mr.is_read = 0 AND mr.is_deleted = 0 AND m.is_draft = 0 AND (m.sent_at IS NULL OR m.sent_at <= GETDATE())
          ORDER BY m.sent_at DESC
          OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY",
         array($userId));

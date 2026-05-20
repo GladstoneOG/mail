@@ -19,7 +19,7 @@ $sql = "SELECT m.id, m.subject, m.body, m.has_attachments, m.sent_at, m.created_
      FROM mail_recipients mr
      JOIN mail_messages m ON mr.message_id = m.id
      JOIN mail_users u ON m.sender_id = u.id
-     WHERE mr.recipient_id = ? AND mr.is_starred = 1 AND mr.is_deleted = 0 AND m.is_draft = 0";
+     WHERE mr.recipient_id = ? AND mr.is_starred = 1 AND mr.is_deleted = 0 AND m.is_draft = 0 AND (m.sent_at IS NULL OR m.sent_at <= GETDATE())";
 $params = array($userId);
 
 if ($search) {
