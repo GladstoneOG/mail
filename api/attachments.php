@@ -24,6 +24,14 @@ if (($action === 'download' || $action === 'preview') && $attachId) {
     $isSender = (intval($att['sender_id']) === $userId);
     if (!$isRecipient && !$isSender) { http_response_code(403); exit('Forbidden'); }
 
+    // Check expiration
+    $decayInfo = get_attachment_decay_info($att['created_at']);
+    if ($decayInfo['expired']) {
+        decay_attachments($conn);
+        http_response_code(410);
+        exit('Attachment expired');
+    }
+
     $filePath = UPLOAD_DIR . $att['stored_name'];
     if (!file_exists($filePath)) { http_response_code(404); exit('File not found'); }
 

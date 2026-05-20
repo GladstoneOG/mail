@@ -111,7 +111,9 @@ if ($recipRow) {
             <h4>&#x1F4CE; Attachments (<?php echo count($attachments); ?>)</h4>
             <div class="attachment-list">
                 <?php foreach ($attachments as $att):
-                    $fileExists = file_exists(UPLOAD_DIR . $att['stored_name']);
+                    $decayInfo = get_attachment_decay_info($att['created_at']);
+                    $isExpired = $decayInfo['expired'];
+                    $fileExists = $isExpired ? false : file_exists(UPLOAD_DIR . $att['stored_name']);
                 ?>
                     <?php if ($fileExists): 
                         $ext = strtolower(pathinfo($att['original_name'], PATHINFO_EXTENSION));
@@ -126,17 +128,28 @@ if ($recipRow) {
                                 <span class="att-icon">&#x1F4C4;</span>
                                 <span class="att-name"><?php echo e($att['original_name']); ?></span>
                                 <span class="att-size"><?php echo format_size($att['file_size']); ?></span>
+                                <span class="att-decay-badge <?php echo $decayInfo['class']; ?>" title="Time remaining before this attachment decays and is deleted from the server">
+                                    ⏱️ <?php echo $decayInfo['text']; ?>
+                                </span>
                             </a>
                             <a href="<?php echo $downloadUrl; ?>" title="Download" style="display:flex; align-items:center; justify-content:center; padding:0 12px; border-left:1px solid var(--border); text-decoration:none; color:var(--text2); transition:background 0.15s;" onmouseover="this.style.background='var(--accent-glow)';" onmouseout="this.style.background='transparent';">
                                 &#x1F4E5;
                             </a>
                         </div>
                     <?php else: ?>
-                        <span class="attachment-item att-removed" title="File removed after all recipients read this message">
-                            <span class="att-icon">&#x1F6AB;</span>
-                            <span class="att-name"><?php echo e($att['original_name']); ?></span>
-                            <span class="att-size"><?php echo format_size($att['file_size']); ?> - removed from server</span>
-                        </span>
+                        <?php if ($isExpired): ?>
+                            <span class="attachment-item att-removed" title="File expired (limit: 30 days)" style="opacity: 0.7; gap: 8px;">
+                                <span class="att-icon">&#x23F1;</span>
+                                <span class="att-name" style="text-decoration: line-through; color: var(--text3);"><?php echo e($att['original_name']); ?></span>
+                                <span class="att-size" style="color: var(--text3);"><?php echo format_size($att['file_size']); ?> - Expired</span>
+                            </span>
+                        <?php else: ?>
+                            <span class="attachment-item att-removed" title="File removed after all recipients read this message">
+                                <span class="att-icon">&#x1F6AB;</span>
+                                <span class="att-name"><?php echo e($att['original_name']); ?></span>
+                                <span class="att-size"><?php echo format_size($att['file_size']); ?> - removed from server</span>
+                            </span>
+                        <?php endif; ?>
                     <?php endif; ?>
                 <?php endforeach; ?>
             </div>

@@ -10,6 +10,12 @@ require_once __DIR__ . '/includes/auth.php';
 
 auth_start_session();
 
+// Run attachment decay cleanup (throttled to once every 5 minutes per session)
+if (!isset($_SESSION['last_attachment_decay_cleanup']) || (time() - $_SESSION['last_attachment_decay_cleanup']) > 300) {
+    decay_attachments($conn);
+    $_SESSION['last_attachment_decay_cleanup'] = time();
+}
+
 // Check if installed
 if (!db_table_exists($conn, 'mail_users')) {
     header('Location: install.php');

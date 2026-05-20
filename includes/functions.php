@@ -105,3 +105,76 @@ function sanitize_html($html) {
     $clean = preg_replace('/\s+on\w+\s*=\s*\S+/i', '', $clean);
     return $clean;
 }
+
+/**
+ * Calculate decay information for an attachment (valid for 30 days).
+ * Returns array with text, CSS class name, and boolean indicating if expired.
+ */
+function get_attachment_decay_info($createdAt) {
+    if (!$createdAt) {
+        return array('expired' => false, 'text' => '', 'class' => '');
+    }
+    // Handle DateTime object if returned by SQLSRV driver
+    if (is_object($createdAt) && $createdAt instanceof DateTime) {
+        $ts = $createdAt->getTimestamp();
+    } else {
+        $ts = is_string($createdAt) ? strtotime($createdAt) : intval($createdAt);
+    }
+    if ($ts === false || $ts <= 0) {
+        return array('expired' => false, 'text' => '', 'class' => '');
+    }
+    
+    $expiry = $ts + 30 * 24 * 3600;
+    $diff = $expiry - time();
+    
+    if ($diff <= 0) {
+        return array('expired' => true, 'text' => 'Expired', 'class' => 'att-decay-expired');
+    }
+    
+    $days = floor($diff / 86400);
+    if ($days > 0) {
+        $hours = floor(($diff % 86400) / 3600);
+        $text = $days . 'd ' . $hours . 'h left';
+        
+        if ($days >= 20) {
+            $class = 'att-decay-safe';
+        } elseif ($days >= 7) {
+            $class = 'att-decay-medium';
+        } else {
+            $class = 'att-decay-warning';
+        }
+    } else {
+        $hours = floor($diff / 3600);
+        $mins = floor(($diff % 3600) / 60);
+        if ($hours > 0) {
+            $text = $hours . 'h ' . $mins . 'm left';
+        } else {
+            $text = $mins . 'm left';
+        }
+        $class = 'att-decay-critical';
+    }
+    
+    return array('expired' => false, 'text' => $text, 'class' => $class);
+}
+
+/**
+ * Scan database for attachments older than 30 days and delete their physical files
+ * from the server to free up space.
+ */
+function decay_attachments($conn) {
+    if (!db_table_exists($conn, 'mail_attachments')) return;
+    
+    // Fetch all attachments older than 30 days
+    $sql = "SELECT id, stored_name FROM mail_attachments WHERE created_at < DATEADD(day, -30, GETDATE())";
+    $expired = db_fetch_all($conn, $sql);
+    
+    if (!empty($expired)) {
+        foreach ($expired as $att) {
+            $filePath = UPLOAD_DIR . $att['stored_name'];
+            if ($filePath && file_exists($filePath)) {
+                @unlink($filePath);
+            }
+        }
+    }
+}
+

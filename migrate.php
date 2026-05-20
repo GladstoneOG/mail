@@ -267,6 +267,16 @@ if (!db_table_exists($conn, 'mail_remember_tokens')) {
     $msgs[] = 'Created indexes for mail_remember_tokens';
 } else { $msgs[] = 'mail_remember_tokens already exists'; }
 
+// ── Index on mail_attachments(created_at) ──
+$check = db_fetch_one($conn, "SELECT 1 FROM sys.indexes WHERE name = 'IX_attach_created_at' AND object_id = OBJECT_ID('mail_attachments')");
+if (!$check) {
+    $r = sqlsrv_query($conn, "CREATE INDEX IX_attach_created_at ON mail_attachments(created_at)");
+    $msgs[] = $r ? 'Created index IX_attach_created_at' : 'FAILED IX_attach_created_at: ' . print_r(sqlsrv_errors(), true);
+    if ($r) sqlsrv_free_stmt($r);
+} else {
+    $msgs[] = 'IX_attach_created_at already exists';
+}
+
 echo '<pre>Migration results: ' . implode("\n", $msgs) . '</pre>';
 echo '<a href="index.php">Go to app</a>';
 
