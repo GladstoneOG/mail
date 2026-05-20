@@ -429,6 +429,40 @@ a:hover {
     flex: 1
 }
 
+.nav-cog-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    color: var(--text3);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    opacity: 0;
+    margin-left: 6px;
+    font-size: 13px;
+}
+
+.nav-item:hover .nav-cog-btn {
+    opacity: 0.6;
+}
+
+.nav-cog-btn:hover {
+    color: var(--text) !important;
+    background: var(--bg4);
+    opacity: 1 !important;
+    transform: rotate(45deg);
+}
+
+.nav-item.active .nav-cog-btn {
+    opacity: 0.4;
+}
+
+.nav-item.active:hover .nav-cog-btn {
+    opacity: 0.8;
+}
+
 .badge {
     background: linear-gradient(135deg, var(--accent), #7c3aed);
     color: #fff;

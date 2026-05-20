@@ -72,6 +72,7 @@ $_foldersExpanded = isset($_COOKIE['folders_expanded']) ? $_COOKIE['folders_expa
                 <a href="index.php?page=inbox" class="nav-item <?php echo $_activePage === 'inbox' ? 'active' : ''; ?>">
                     <span class="nav-icon">&#x1F4E5;</span><span class="nav-label">Inbox</span>
                     <?php if ($unreadCount > 0): ?><span class="badge"><?php echo $unreadCount; ?></span><?php endif; ?>
+                    <span class="nav-cog-btn" onclick="event.preventDefault(); event.stopPropagation(); openRulesManager();" title="Inbox Rules">&#x2699;&#xFE0F;</span>
                 </a>
                 <a href="index.php?page=starred" class="nav-item <?php echo $_activePage === 'starred' ? 'active' : ''; ?>">
                     <span class="nav-icon">&#x2B50;</span><span class="nav-label">Starred</span>
@@ -117,10 +118,7 @@ $_foldersExpanded = isset($_COOKIE['folders_expanded']) ? $_COOKIE['folders_expa
                     <span class="nav-icon">&#x1F4C5;</span><span class="nav-label">Calendar</span>
                     <?php if ($_calTodayCount > 0): ?><span class="badge"><?php echo $_calTodayCount; ?></span><?php endif; ?>
                 </a>
-                <div class="nav-divider"></div>
-                <a href="javascript:void(0)" class="nav-item" onclick="openRulesManager()">
-                    <span class="nav-icon">&#x2699;&#xFE0F;</span><span class="nav-label">Inbox Rules</span>
-                </a>
+
                 <?php if (auth_is_admin()): ?>
                 <div class="nav-divider"></div>
                 <a href="index.php?page=admin" class="nav-item <?php echo $_activePage === 'admin' ? 'active' : ''; ?>">
