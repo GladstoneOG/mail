@@ -78,9 +78,9 @@ if (isset($_GET['to'])) $prefillTo = $_GET['to'];
 $allUsers = db_fetch_all($conn, "SELECT id, username, display_name FROM mail_users WHERE id != ? AND is_active = 1 ORDER BY display_name", array($userId));
 ?>
 
-<!-- Quill.js CDN -->
-<link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
-<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+<!-- Quill.js Editor Assets -->
+<?php render_quill_css(); ?>
+<?php render_quill_js(); ?>
 
 <!-- Address Book Modal (#1) -->
 <div class="modal-overlay" id="ab-modal" style="display:none" onclick="if(event.target===this)closeAddressBook()">

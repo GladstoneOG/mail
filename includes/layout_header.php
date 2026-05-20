@@ -56,6 +56,7 @@ $_foldersExpanded = isset($_COOKIE['folders_expanded']) ? $_COOKIE['folders_expa
     <title><?php echo e(APP_NAME); ?></title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="icon" type="image/png" href="assets/icon.png" id="favicon">
+    <?php render_font_assets(); ?>
     <script>
         function toggleSidebar() {
             if (window.innerWidth <= 768) {

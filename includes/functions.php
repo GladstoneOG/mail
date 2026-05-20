@@ -4,6 +4,8 @@
  * PHP 5.6 compatible.
  */
 
+require_once __DIR__ . '/cdn_assets.php';
+
 function e($str) {
     return htmlspecialchars($str, ENT_QUOTES, 'UTF-8');
 }
