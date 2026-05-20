@@ -13,14 +13,15 @@ $orderMap = array('date' => 'm.sent_at', 'name' => 'u.display_name', 'subject' =
 $orderCol = $orderMap[$sort];
 $orderDir = strtoupper($dir);
 
+$nowStr = date('Y-m-d H:i:s');
 $sql = "SELECT m.id, m.subject, m.body, m.has_attachments, m.sent_at, m.created_at,
             MIN(CAST(mr.is_read AS INT)) AS is_read, MAX(CAST(mr.is_starred AS INT)) AS is_starred,
             u.display_name AS sender_name, u.username AS sender_username
      FROM mail_recipients mr
      JOIN mail_messages m ON mr.message_id = m.id
      JOIN mail_users u ON m.sender_id = u.id
-     WHERE mr.recipient_id = ? AND mr.is_starred = 1 AND mr.is_deleted = 0 AND m.is_draft = 0 AND (m.sent_at IS NULL OR m.sent_at <= GETDATE())";
-$params = array($userId);
+     WHERE mr.recipient_id = ? AND mr.is_starred = 1 AND mr.is_deleted = 0 AND m.is_draft = 0 AND (m.sent_at IS NULL OR m.sent_at <= ?)";
+$params = array($userId, $nowStr);
 
 if ($search) {
     $searchField = isset($_GET['sf']) ? $_GET['sf'] : '';

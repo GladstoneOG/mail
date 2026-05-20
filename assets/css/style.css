@@ -4356,4 +4356,79 @@ body.trash-mode .message-item:hover {
 
 [data-theme="light"] .msg-row.msg-scheduled:hover {
     background: linear-gradient(135deg, rgba(251, 191, 36, .15), rgba(245, 158, 11, .08));
+}
+
+/* ===== HEADER CLOCK STYLE ===== */
+.header-clock {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Inter', -apple-system, monospace;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    padding: 5px 10px;
+    border-radius: var(--radius-sm);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    user-select: none;
+    letter-spacing: 0.2px;
+}
+
+[data-theme="light"] .header-clock {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    color: #475569;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.header-clock .clock-icon {
+    font-size: 13px;
+    opacity: 0.9;
+}
+
+.header-clock .clock-date {
+    font-weight: 500;
+    opacity: 0.85;
+    border-right: 1px solid var(--border);
+    padding-right: 8px;
+    margin-right: 2px;
+}
+
+[data-theme="light"] .header-clock .clock-date {
+    border-color: #cbd5e1;
+}
+
+.header-clock .clock-time {
+    font-weight: 600;
+    color: var(--text);
+}
+
+[data-theme="light"] .header-clock .clock-time {
+    color: #1e293b;
+}
+
+.header-clock .clock-colon {
+    animation: clockBlink 1s step-end infinite;
+    display: inline-block;
+    width: 6px;
+    text-align: center;
+}
+
+@keyframes clockBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+.header-clock .clock-tz {
+    font-size: 10px;
+    text-transform: uppercase;
+    background: var(--accent-glow);
+    color: var(--accent2);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    margin-left: 4px;
 }

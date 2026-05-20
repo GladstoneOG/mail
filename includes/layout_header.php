@@ -4,15 +4,16 @@ $_draftCount = intval(db_fetch_scalar($conn, "SELECT COUNT(*) FROM mail_messages
 $_theme = isset($_COOKIE['lanmail_theme']) ? $_COOKIE['lanmail_theme'] : 'dark';
 
 // Recent messages for notification dropdown (#3)
+$nowStr = date('Y-m-d H:i:s');
 $_recentUnread = db_fetch_all($conn,
     "SELECT m.id, m.subject, u.display_name AS sender_name, m.sent_at
      FROM mail_recipients mr
      JOIN mail_messages m ON mr.message_id = m.id
      JOIN mail_users u ON m.sender_id = u.id
-     WHERE mr.recipient_id = ? AND mr.is_read = 0 AND mr.is_deleted = 0 AND m.is_draft = 0 AND (m.sent_at IS NULL OR m.sent_at <= GETDATE())
+     WHERE mr.recipient_id = ? AND mr.is_read = 0 AND mr.is_deleted = 0 AND m.is_draft = 0 AND (m.sent_at IS NULL OR m.sent_at <= ?)
      ORDER BY m.sent_at DESC
      OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY",
-    array(auth_user_id()));
+    array(auth_user_id(), $nowStr));
 
 // Calendar: today's event count for sidebar badge
 $_calTodayCount = 0;
@@ -153,6 +154,47 @@ $_foldersExpanded = isset($_COOKIE['folders_expanded']) ? $_COOKIE['folders_expa
                     }
                 ?></div>
                 <div class="topbar-actions">
+                    <?php $serverEpochMs = time() * 1000; ?>
+                    <div class="header-clock" id="header-clock" data-initial-ms="<?php echo $serverEpochMs; ?>">
+                        <span class="clock-icon">🕒</span>
+                        <span class="clock-date">--/--/----</span>
+                        <span class="clock-time">00<span class="clock-colon">:</span>00</span>
+                        <span class="clock-tz">GMT+7</span>
+                    </div>
+                    <script>
+                    (function() {
+                        var clockEl = document.getElementById('header-clock');
+                        if (!clockEl) return;
+                        
+                        var initialServerMs = parseFloat(clockEl.getAttribute('data-initial-ms'));
+                        var clientStartMs = Date.now();
+                        var serverTimeOffset = initialServerMs - clientStartMs;
+                        window.serverTimeOffset = serverTimeOffset;
+
+                        function updateClock() {
+                            var currentServerTime = new Date(Date.now() + serverTimeOffset);
+                            
+                            // Adjust to GMT+7 (7 hours in ms = 25200000 ms)
+                            var gmt7Time = new Date(currentServerTime.getTime() + 25200000);
+                            
+                            var day = String(gmt7Time.getUTCDate()).padStart(2, '0');
+                            var month = String(gmt7Time.getUTCMonth() + 1).padStart(2, '0');
+                            var year = gmt7Time.getUTCFullYear();
+                            
+                            var hours = String(gmt7Time.getUTCHours()).padStart(2, '0');
+                            var minutes = String(gmt7Time.getUTCMinutes()).padStart(2, '0');
+                            
+                            var dateSpan = clockEl.querySelector('.clock-date');
+                            var timeSpan = clockEl.querySelector('.clock-time');
+                            
+                            if (dateSpan) dateSpan.textContent = day + '/' + month + '/' + year;
+                            if (timeSpan) timeSpan.innerHTML = hours + '<span class="clock-colon">:</span>' + minutes;
+                        }
+                        
+                        updateClock();
+                        setInterval(updateClock, 1000);
+                    })();
+                    </script>
                     <button class="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode" id="theme-toggle">
                         <?php echo $_theme === 'light' ? '&#x1F319;' : '&#x1F506;'; ?>
                     </button>

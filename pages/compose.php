@@ -367,19 +367,27 @@ function toggleScheduleDropdown() {
         dd.classList.remove('show');
     } else {
         // Set today hint
-        var now = new Date();
+        var now = getServerTime();
         var hint = document.getElementById('schedule-today-time');
         if (hint) {
             var evening = new Date(now); evening.setHours(18, 0, 0, 0);
             if (now.getHours() >= 18) evening.setDate(evening.getDate() + 1);
             hint.textContent = '(' + evening.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'}) + ')';
         }
-        // Set min date for custom picker
+        // Set min date and default to current server date & time for custom picker
         var dateInput = document.getElementById('schedule-date');
+        var timeInput = document.getElementById('schedule-time');
+        var y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,'0'), d = String(now.getDate()).padStart(2,'0');
+        var h = String(now.getHours()).padStart(2,'0'), min = String(now.getMinutes()).padStart(2,'0');
+        
         if (dateInput) {
-            var y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,'0'), d = String(now.getDate()).padStart(2,'0');
             dateInput.min = y + '-' + m + '-' + d;
             if (!dateInput.value) dateInput.value = y + '-' + m + '-' + d;
+        }
+        if (timeInput) {
+            if (!timeInput.value || timeInput.value === '08:00') {
+                timeInput.value = h + ':' + min;
+            }
         }
         dd.classList.add('show');
         // Close on outside click
@@ -415,7 +423,7 @@ function onScheduleChange() {
 
     customFields.style.display = val === 'custom' ? 'block' : 'none';
 
-    var now = new Date();
+    var now = getServerTime();
     var target;
 
     if (val === 'today_evening') {

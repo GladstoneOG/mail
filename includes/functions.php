@@ -62,10 +62,11 @@ function get_avatar_color($name) {
 }
 
 function get_unread_count($conn, $userId) {
+    $nowStr = date('Y-m-d H:i:s');
     $sql = "SELECT COUNT(DISTINCT m.id) FROM mail_recipients mr
             JOIN mail_messages m ON mr.message_id = m.id
-            WHERE mr.recipient_id = ? AND mr.is_read = 0 AND mr.is_deleted = 0 AND m.is_draft = 0 AND (mr.folder_id IS NULL) AND (m.sent_at IS NULL OR m.sent_at <= GETDATE())";
-    return intval(db_fetch_scalar($conn, $sql, array($userId)));
+            WHERE mr.recipient_id = ? AND mr.is_read = 0 AND mr.is_deleted = 0 AND m.is_draft = 0 AND (mr.folder_id IS NULL) AND (m.sent_at IS NULL OR m.sent_at <= ?)";
+    return intval(db_fetch_scalar($conn, $sql, array($userId, $nowStr)));
 }
 
 function get_csrf_token() {

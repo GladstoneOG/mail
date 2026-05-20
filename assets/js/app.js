@@ -10,6 +10,12 @@ function escHtml(s) {
     return d.innerHTML;
 }
 
+// Global server-synchronized time helper
+function getServerTime() {
+    var offset = typeof window.serverTimeOffset !== 'undefined' ? window.serverTimeOffset : 0;
+    return new Date(Date.now() + offset);
+}
+
 // ============ CUSTOM DIALOG ============
 (function () {
     var dialogHtml = '<div class="modal-overlay" id="custom-dialog-modal" style="display:none;z-index:10000">' +
@@ -314,7 +320,7 @@ function sendMessage(isDraft) {
         var scheduledVal = document.getElementById('scheduled-at-input');
         if (scheduledVal && scheduledVal.value) {
             var scheduledDate = new Date(scheduledVal.value.replace(' ', 'T'));
-            if (scheduledDate <= new Date()) {
+            if (scheduledDate <= getServerTime()) {
                 showToast('Scheduled time must be in the future', 'error');
                 return;
             }

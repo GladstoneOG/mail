@@ -53,19 +53,19 @@ function showContextMenu(x, y){
         // Drafts: only Edit and Delete
         html += '<button class="ctx-menu-item" onclick="ctxAction(\'edit_draft\')"><span class="ctx-menu-icon">✏️</span>Edit Draft</button>';
         html += '<div class="ctx-menu-sep"></div>';
-        html += '<button class="ctx-menu-item ctx-danger" onclick="ctxAction(\'delete_draft\')"><span class="ctx-menu-icon">🗑</span>Delete Draft</button>';
+        html += '<button class="ctx-menu-item ctx-danger" onclick="ctxAction(\'delete_draft\')"><span class="ctx-menu-icon">🗑️</span>Delete Draft</button>';
     } else if(currentPage === 'trash') {
         // Trash: only Restore and Delete permanently
         html += '<button class="ctx-menu-item" onclick="ctxAction(\'restore\')"><span class="ctx-menu-icon">↩️</span>Restore to Inbox</button>';
         html += '<div class="ctx-menu-sep"></div>';
-        html += '<button class="ctx-menu-item ctx-danger" onclick="ctxAction(\'delete\')"><span class="ctx-menu-icon">🗑</span>Delete Permanently</button>';
+        html += '<button class="ctx-menu-item ctx-danger" onclick="ctxAction(\'delete\')"><span class="ctx-menu-icon">🗑️</span>Delete Permanently</button>';
     } else {
         // Full context menu for inbox, sent, starred, folder
         html += '<button class="ctx-menu-item" onclick="ctxAction(\'reply\')"><span class="ctx-menu-icon">↩️</span>Reply</button>';
         html += '<button class="ctx-menu-item" onclick="ctxAction(\'forward\')"><span class="ctx-menu-icon">↪️</span>Forward</button>';
         html += '<div class="ctx-menu-sep"></div>';
-        html += '<button class="ctx-menu-item" onclick="ctxAction(\'star\')"><span class="ctx-menu-icon">' + (ctxMsgData.starred ? '⭐' : '☆') + '</span>' + (ctxMsgData.starred ? 'Unstar' : 'Star') + '</button>';
-        html += '<button class="ctx-menu-item" onclick="ctxAction(\'' + (ctxMsgData.isRead ? 'mark_unread' : 'mark_read') + '\')"><span class="ctx-menu-icon">' + (ctxMsgData.isRead ? '●' : '✓') + '</span>Mark as ' + (ctxMsgData.isRead ? 'unread' : 'read') + '</button>';
+        html += '<button class="ctx-menu-item" onclick="ctxAction(\'star\')"><span class="ctx-menu-icon">' + (ctxMsgData.starred ? '⭐' : '🌟') + '</span>' + (ctxMsgData.starred ? 'Unstar' : 'Star') + '</button>';
+        html += '<button class="ctx-menu-item" onclick="ctxAction(\'' + (ctxMsgData.isRead ? 'mark_unread' : 'mark_read') + '\')"><span class="ctx-menu-icon">' + (ctxMsgData.isRead ? '✉️' : '📩') + '</span>Mark as ' + (ctxMsgData.isRead ? 'unread' : 'read') + '</button>';
         html += '<div class="ctx-menu-sep"></div>';
         html += '<div class="ctx-menu-sub">Tags</div>';
         html += '<div class="ctx-tag-list" id="ctx-tag-list">';
@@ -78,7 +78,7 @@ function showContextMenu(x, y){
         html += '<button class="ctx-menu-item" onclick="ctxAction(\'move\')"><span class="ctx-menu-icon">📂</span>Move to...</button>';
         html += '<button class="ctx-menu-item" onclick="ctxAction(\'find_sender\')"><span class="ctx-menu-icon">🔍</span>Find emails from sender</button>';
         html += '<div class="ctx-menu-sep"></div>';
-        html += '<button class="ctx-menu-item ctx-danger" onclick="ctxAction(\'delete\')"><span class="ctx-menu-icon">🗑</span>Delete</button>';
+        html += '<button class="ctx-menu-item ctx-danger" onclick="ctxAction(\'delete\')"><span class="ctx-menu-icon">🗑️</span>Delete</button>';
     }
 
     ctxMenu.innerHTML = html;

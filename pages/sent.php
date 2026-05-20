@@ -13,6 +13,8 @@ $dir = isset($_GET['dir']) ? $_GET['dir'] : 'desc';
 if (!in_array($sort, array('date', 'name', 'subject'))) $sort = 'date';
 if (!in_array($dir, array('asc', 'desc'))) $dir = 'desc';
 
+$nowStr = date('Y-m-d H:i:s');
+
 // Fetch scheduled (future) messages - always shown at top
 $scheduledMessages = array();
 if (!$search) {
@@ -20,9 +22,9 @@ if (!$search) {
         "SELECT m.id, m.subject, m.body, m.has_attachments, m.sent_at, m.created_at, m.scheduled_at,
             (SELECT TOP 1 u.display_name FROM mail_recipients mr JOIN mail_users u ON mr.recipient_id = u.id WHERE mr.message_id = m.id AND mr.recipient_type = 'to' ORDER BY mr.id) as to_name
          FROM mail_messages m
-         WHERE m.sender_id = ? AND m.is_draft = 0 AND m.sender_deleted = 0 AND m.scheduled_at IS NOT NULL AND m.sent_at > GETDATE()
+         WHERE m.sender_id = ? AND m.is_draft = 0 AND m.sender_deleted = 0 AND m.scheduled_at IS NOT NULL AND m.sent_at > ?
          ORDER BY m.sent_at ASC",
-        array($userId));
+        array($userId, $nowStr));
     foreach ($scheduledMessages as &$smsg) {
         if (!$smsg['to_name']) $smsg['to_name'] = 'Unknown';
         $smsg['recip_count'] = intval(db_fetch_scalar($conn,
@@ -32,8 +34,8 @@ if (!$search) {
 }
 
 // Count for pagination (exclude scheduled-future from regular list)
-$countSql = "SELECT COUNT(*) FROM mail_messages m WHERE m.sender_id = ? AND m.is_draft = 0 AND m.sender_deleted = 0 AND (m.scheduled_at IS NULL OR m.sent_at <= GETDATE())";
-$countParams = array($userId);
+$countSql = "SELECT COUNT(*) FROM mail_messages m WHERE m.sender_id = ? AND m.is_draft = 0 AND m.sender_deleted = 0 AND (m.scheduled_at IS NULL OR m.sent_at <= ?)";
+$countParams = array($userId, $nowStr);
 
 $searchField = '';
 $searchLike = '';
@@ -84,8 +86,8 @@ $orderDir = strtoupper($dir);
 $sql = "SELECT m.id, m.subject, m.body, m.has_attachments, m.sent_at, m.created_at, m.scheduled_at,
             (SELECT TOP 1 u.display_name FROM mail_recipients mr JOIN mail_users u ON mr.recipient_id = u.id WHERE mr.message_id = m.id AND mr.recipient_type = 'to' ORDER BY mr.id) as to_name
      FROM mail_messages m
-     WHERE m.sender_id = ? AND m.is_draft = 0 AND m.sender_deleted = 0 AND (m.scheduled_at IS NULL OR m.sent_at <= GETDATE())";
-$params = array($userId);
+     WHERE m.sender_id = ? AND m.is_draft = 0 AND m.sender_deleted = 0 AND (m.scheduled_at IS NULL OR m.sent_at <= ?)";
+$params = array($userId, $nowStr);
 
 if ($search) {
     if ($searchField === 'sender') {
@@ -189,7 +191,7 @@ function sent_sort_link($col, $label, $currentSort, $currentDir) {
                         </td>
                         <td class="col-attach-cell"><?php echo $msg['has_attachments'] ? '&#x1F4CE;' : ''; ?></td>
                         <td class="col-date-cell">
-                            <span class="msg-scheduled-time"><?php echo format_date($msg['sent_at']); ?></span>
+                            <span class="msg-scheduled-time" data-countdown-target="<?php echo strtotime($msg['sent_at']) * 1000; ?>">in --</span>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -235,3 +237,63 @@ function sent_sort_link($col, $label, $currentSort, $currentDir) {
         </div>
     <?php endif; ?>
 <?php endif; ?>
+
+<script>
+(function() {
+    function startScheduledCountdowns() {
+        function updateCountdowns() {
+            var elements = document.querySelectorAll('[data-countdown-target]');
+            if (elements.length === 0) return;
+            
+            var nowMs = (typeof getServerTime === 'function') ? getServerTime().getTime() : Date.now();
+            
+            elements.forEach(function(el) {
+                var targetMs = parseFloat(el.getAttribute('data-countdown-target'));
+                var diffMs = targetMs - nowMs;
+                
+                if (diffMs <= 0) {
+                    el.textContent = 'Sending...';
+                    setTimeout(function() {
+                        if (window.location.search.indexOf('page=sent') !== -1) {
+                            window.location.reload();
+                        }
+                    }, 1500);
+                    return;
+                }
+                
+                var totalSec = Math.floor(diffMs / 1000);
+                var sec = totalSec % 60;
+                var totalMin = Math.floor(totalSec / 60);
+                var min = totalMin % 60;
+                var totalHours = Math.floor(totalMin / 60);
+                var hours = totalHours % 24;
+                var days = Math.floor(totalHours / 24);
+                
+                var text = 'in ';
+                if (days > 0) {
+                    text += days + 'd ' + hours + 'h';
+                } else if (hours > 0) {
+                    text += hours + 'h ' + min + 'm';
+                } else if (min > 0) {
+                    text += min + 'm ' + sec + 's';
+                } else {
+                    text += sec + 's';
+                }
+                
+                el.textContent = text;
+            });
+        }
+        
+        updateCountdowns();
+        var timerId = setInterval(updateCountdowns, 1000);
+        if (window.activeCountdownTimer) clearInterval(window.activeCountdownTimer);
+        window.activeCountdownTimer = timerId;
+    }
+    
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', startScheduledCountdowns);
+    } else {
+        startScheduledCountdowns();
+    }
+})();
+</script>
