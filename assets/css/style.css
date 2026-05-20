@@ -245,8 +245,73 @@ a:hover {
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
-    transition: transform .3s;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s ease;
     position: relative
+}
+
+.sidebar.collapsed {
+    width: 72px;
+}
+
+/* Collapsed Sidebar elements styling */
+.sidebar.collapsed .logo-text,
+.sidebar.collapsed .compose-text,
+.sidebar.collapsed .nav-label,
+.sidebar.collapsed .badge,
+.sidebar.collapsed .nav-cog-btn,
+.sidebar.collapsed .folders-chevron,
+.sidebar.collapsed .user-info,
+.sidebar.collapsed .logout-btn {
+    display: none !important;
+}
+
+.sidebar.collapsed .sidebar-header {
+    padding: 20px 0 16px;
+    display: flex;
+    justify-content: center;
+}
+
+.sidebar.collapsed .logo {
+    justify-content: center;
+    gap: 0;
+}
+
+.sidebar.collapsed .compose-btn {
+    margin: 0 auto 16px;
+    padding: 0;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+}
+
+.sidebar.collapsed .nav-item {
+    justify-content: center;
+    padding: 10px 0;
+}
+
+.sidebar.collapsed .nav-folders-toggle {
+    justify-content: center;
+    padding: 10px 0;
+    width: 100%;
+}
+
+.sidebar.collapsed .nav-folders-list {
+    display: none !important;
+}
+
+.sidebar.collapsed .sidebar-footer {
+    padding: 12px 0;
+    justify-content: center;
+}
+
+.sidebar.collapsed .sidebar-footer .user-card {
+    justify-content: center;
+    padding: 8px 0;
+}
+
+.sidebar.collapsed #sidebar-mini-cal-container {
+    display: none !important;
 }
 
 .sidebar::before {
@@ -3000,9 +3065,45 @@ body.trash-mode .message-item:hover {
 }
 
 /* Sidebar mini calendar */
+.sidebar-mini-cal-container {
+    width: 100%;
+    background: transparent;
+    display: flex;
+    flex-direction: column;
+}
+
+.mini-cal-toggle-bar {
+    display: flex;
+    justify-content: center;
+    padding: 6px 0 2px;
+    border-top: 1px solid var(--border);
+}
+
+.mini-cal-toggle-btn {
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 10px;
+    padding: 2px 10px;
+    border-radius: 10px;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mini-cal-toggle-btn:hover {
+    color: var(--text);
+    background: var(--bg4);
+}
+
+.sidebar-mini-cal-container.collapsed .sidebar-mini-cal {
+    display: none !important;
+}
+
 .sidebar-mini-cal {
-    padding: 8px 16px 12px;
-    border-top: 1px solid var(--border)
+    padding: 4px 16px 12px;
 }
 
 .mini-cal-header {

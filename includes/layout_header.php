@@ -2,6 +2,8 @@
 $_activePage = isset($page) ? $page : 'inbox';
 $_draftCount = intval(db_fetch_scalar($conn, "SELECT COUNT(*) FROM mail_messages WHERE sender_id = ? AND is_draft = 1", array(auth_user_id())));
 $_theme = isset($_COOKIE['lanmail_theme']) ? $_COOKIE['lanmail_theme'] : 'dark';
+$_sidebarCollapsed = isset($_COOKIE['sidebar_collapsed']) && $_COOKIE['sidebar_collapsed'] === '1';
+$_miniCalCollapsed = isset($_COOKIE['mini_cal_collapsed']) && $_COOKIE['mini_cal_collapsed'] === '1';
 
 // Recent messages for notification dropdown (#3)
 $nowStr = date('Y-m-d H:i:s');
@@ -54,18 +56,36 @@ $_foldersExpanded = isset($_COOKIE['folders_expanded']) ? $_COOKIE['folders_expa
     <title><?php echo e(APP_NAME); ?></title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="icon" type="image/png" href="assets/icon.png" id="favicon">
+    <script>
+        function toggleSidebar() {
+            var sidebar = document.querySelector('.sidebar');
+            var isCollapsed = sidebar.classList.toggle('collapsed');
+            document.cookie = "sidebar_collapsed=" + (isCollapsed ? "1" : "0") + "; path=/; max-age=" + (365*24*60*60);
+            window.dispatchEvent(new Event('resize'));
+        }
+        function toggleMiniCal() {
+            var container = document.getElementById('sidebar-mini-cal-container');
+            var btn = document.getElementById('mini-cal-toggle-btn');
+            var isCollapsed = container.classList.toggle('collapsed');
+            if (btn) {
+                btn.innerHTML = isCollapsed ? '&#x25BC;' : '&#x25B2;';
+            }
+            document.cookie = "mini_cal_collapsed=" + (isCollapsed ? "1" : "0") + "; path=/; max-age=" + (365*24*60*60);
+        }
+    </script>
 </head>
 <body>
     <div class="app-container">
-        <aside class="sidebar">
-            <div class="sidebar-header">
+        <aside class="sidebar<?php echo $_sidebarCollapsed ? ' collapsed' : ''; ?>">
+            <div class="sidebar-header" onclick="toggleSidebar()" style="cursor: pointer;" title="Toggle Sidebar">
                 <div class="logo">
                     <img src="assets/header_icon.png" class="logo-icon" alt="Logo" style="height: 24px; width: auto; object-fit: contain;">
                     <span class="logo-text"><?php echo e(APP_NAME); ?></span>
                 </div>
             </div>
             <a href="index.php?page=compose" class="compose-btn">
-                <span class="compose-icon">&#x1F4E7;</span> Compose
+                <span class="compose-icon">&#x1F4E7;</span>
+                <span class="compose-text">Compose</span>
             </a>
             <div class="sidebar-scroll-area">
             <nav class="sidebar-nav">
@@ -126,7 +146,14 @@ $_foldersExpanded = isset($_COOKIE['folders_expanded']) ? $_COOKIE['folders_expa
                 </a>
                 <?php endif; ?>
             </nav>
-            <div class="sidebar-mini-cal" id="sidebar-mini-cal"></div>
+            </div>
+            <div class="sidebar-mini-cal-container<?php echo $_miniCalCollapsed ? ' collapsed' : ''; ?>" id="sidebar-mini-cal-container">
+                <div class="mini-cal-toggle-bar">
+                    <button class="mini-cal-toggle-btn" onclick="toggleMiniCal()" id="mini-cal-toggle-btn" title="Toggle calendar">
+                        <?php echo $_miniCalCollapsed ? '&#x25BC;' : '&#x25B2;'; ?>
+                    </button>
+                </div>
+                <div class="sidebar-mini-cal" id="sidebar-mini-cal"></div>
             </div>
             <div class="sidebar-footer">
                 <a href="index.php?page=profile" class="user-card <?php echo $_activePage === 'profile' ? 'active' : ''; ?>">
