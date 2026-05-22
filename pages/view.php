@@ -267,29 +267,14 @@ function render_forwarded_chain_html($fwd) {
     <?php
 }
 
-// Find the latest message in the thread for default actions in page header
+// Find the latest message in the thread
 $lastThreadMsg = end($threadMessages);
 reset($threadMessages);
 $lastMsgId = $lastThreadMsg ? $lastThreadMsg['msg']['id'] : $msgId;
-$lastMsgIsRetracted = $lastThreadMsg ? (isset($lastThreadMsg['msg']['is_retracted']) && $lastThreadMsg['msg']['is_retracted']) : false;
-$lastMsgIsSender = $lastThreadMsg ? (intval($lastThreadMsg['msg']['sender_id']) === $userId) : false;
 ?>
 
 <div class="page-header">
     <a href="index.php?page=<?php echo e($backPage); ?>" class="back-btn">&larr; Back</a>
-    <div class="page-actions">
-        <?php if (!$lastMsgIsRetracted): ?>
-            <?php if (!$lastMsgIsSender): ?>
-                <a href="index.php?page=compose&reply=<?php echo $lastMsgId; ?>" class="btn btn-sm btn-primary">&#x21A9; Reply</a>
-                <a href="index.php?page=compose&replyall=<?php echo $lastMsgId; ?>" class="btn btn-sm btn-secondary">&#x21A9; Reply All</a>
-            <?php endif; ?>
-            <a href="index.php?page=compose&forward=<?php echo $lastMsgId; ?>" class="btn btn-sm btn-secondary">&#x21AA; Forward</a>
-        <?php endif; ?>
-        <?php if ($lastMsgIsSender && !$lastMsgIsRetracted): ?>
-            <button class="btn btn-sm btn-warning" onclick="retractMessage(<?php echo $lastMsgId; ?>)">&#x21A9; Unsend</button>
-        <?php endif; ?>
-        <button class="btn btn-sm btn-danger" onclick="deleteMessage(<?php echo $lastMsgId; ?>,'<?php echo e($backPage); ?>')">&#x1F5D1; Delete</button>
-    </div>
 </div>
 
 <h2 class="thread-subject"><?php echo e($msg['subject']); ?></h2>
