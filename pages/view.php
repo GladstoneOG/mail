@@ -293,9 +293,9 @@ $lastMsgId = $lastThreadMsg ? $lastThreadMsg['msg']['id'] : $msgId;
         // Expand the specific message they clicked on, OR the last message in the thread
         $isExpanded = ($tId === $msgId || (count($threadMessages) === 1) || ($tId === $lastMsgId && $msgId === 0));
     ?>
-        <div class="thread-card <?php echo $isExpanded ? 'expanded' : 'collapsed'; ?>" id="thread-card-<?php echo $tId; ?>" onclick="toggleThreadCard(<?php echo $tId; ?>, event)">
+        <div class="thread-card <?php echo $isExpanded ? 'expanded' : 'collapsed'; ?>" id="thread-card-<?php echo $tId; ?>">
             <!-- Collapsed Header -->
-            <div class="thread-card-collapsed-header">
+            <div class="thread-card-collapsed-header" onclick="toggleThreadCard(<?php echo $tId; ?>, event)">
                 <div class="thread-card-avatar" style="background:<?php echo get_avatar_color($tmsg['sender_name']); ?>">
                     <?php echo e(get_initials($tmsg['sender_name'])); ?>
                 </div>
@@ -352,6 +352,12 @@ $lastMsgId = $lastThreadMsg ? $lastThreadMsg['msg']['id'] : $msgId;
                             <button class="btn btn-xs btn-warning" onclick="retractMessage(<?php echo $tId; ?>)">&#x21A9; Unsend</button>
                         <?php endif; ?>
                         <button class="btn btn-xs btn-danger" onclick="deleteMessage(<?php echo $tId; ?>,'<?php echo e($backPage); ?>')">&#x1F5D1; Delete</button>
+                        
+                        <!-- Separate Collapse Control -->
+                        <div style="width: 1px; height: 16px; background: var(--border); margin: 0 4px 0 8px; display: inline-block;"></div>
+                        <button class="btn-card-collapse" onclick="toggleThreadCard(<?php echo $tId; ?>, event)" title="Collapse message">
+                            &#x25B2;
+                        </button>
                     </div>
                 </div>
                 
@@ -427,10 +433,6 @@ $lastMsgId = $lastThreadMsg ? $lastThreadMsg['msg']['id'] : $msgId;
 
 <script>
 function toggleThreadCard(msgId, event) {
-    // If the click is inside a button, link, or action block, do not toggle the card
-    if (event.target.closest('a') || event.target.closest('button') || event.target.closest('.thread-card-actions') || event.target.closest('.attachment-item')) {
-        return;
-    }
     var card = document.getElementById('thread-card-' + msgId);
     if (card) {
         card.classList.toggle('collapsed');

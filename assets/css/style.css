@@ -4773,9 +4773,42 @@ body.trash-mode .message-item:hover {
 
 .thread-card-actions {
     display: inline-flex;
+    align-items: center;
     gap: 6px;
     margin-left: auto;
 }
+
+.btn-card-collapse {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text2);
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 8px;
+    line-height: 1;
+    flex-shrink: 0;
+    padding: 0 0 1px 0; /* subtle offset to center the upward triangle glyph perfectly */
+}
+
+.btn-card-collapse:hover {
+    background: var(--bg4);
+    color: var(--text);
+    border-color: var(--accent);
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.25);
+    transform: translateY(-1px);
+}
+
+.btn-card-collapse:active {
+    transform: translateY(0);
+}
+
+
 
 .btn-xs {
     padding: 4px 10px;
